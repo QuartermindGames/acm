@@ -7,7 +7,7 @@
 #include <plcore/pl_linkedlist.h>
 #include <plcore/pl_console.h>
 
-#include "acm/public/acm/acm.h"
+#include "acm/acm.h"
 
 /* node structure
  *  string
