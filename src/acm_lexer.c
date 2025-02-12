@@ -4,10 +4,7 @@
 
 //#define ACM_TEST
 
-#include <plcore/pl_parse.h>
-#if defined( ACM_TEST )
-#	include <plcore/pl_timer.h>
-#endif
+#include <ctype.h>
 
 #include "acm_private.h"
 
@@ -38,7 +35,191 @@ static AcmLexerReservedWord reservedWords[] = {
         {"{",       ACM_TOKEN_TYPE_OPEN_BRACKET },
         {"}",       ACM_TOKEN_TYPE_CLOSE_BRACKET},
 };
-static const unsigned int NUM_RESERVED_WORDS = PL_ARRAY_ELEMENTS( reservedWords );
+static const unsigned int NUM_RESERVED_WORDS = ( sizeof( reservedWords ) / sizeof( *( reservedWords ) ) );
+
+#define NOT_TERMINATING_CHAR( P ) ( ( P ) != '\0' && ( P ) != '\n' && ( P ) != '\r' )
+
+static int get_line_end( const char *p )
+{
+	if ( *p == '\0' ) return 0;
+	if ( *p == '\n' ) return 1;
+	if ( *p == '\r' && *( p + 1 ) == '\n' ) return 2;
+
+	return -1;
+}
+
+static bool is_line_end( const char *p )
+{
+	return get_line_end( p ) != -1;
+}
+
+static bool is_whitespace( const char *p )
+{
+	if ( is_line_end( p ) )
+	{
+		return false;
+	}
+
+	return isspace( *p ) || *p == '\t';
+}
+
+static void skip_whitespace( const char **p )
+{
+	if ( !is_whitespace( *p ) )
+	{
+		return;
+	}
+
+	do
+	{
+		( *p )++;
+	} while ( is_whitespace( *p ) );
+}
+
+static void skip_line( const char **p )
+{
+	while ( NOT_TERMINATING_CHAR( *( *p ) ) ) ( *p )++;
+	if ( *( *p ) == '\r' ) ( *p )++;
+	if ( *( *p ) == '\n' ) ( *p )++;
+}
+
+static unsigned int get_token_length( const char *p )
+{
+	skip_whitespace( &p );
+
+	const char *s = p;
+	while ( *p != '\0' && *p != ' ' )
+	{
+		if ( is_line_end( p ) )
+		{
+			break;
+		}
+
+		p++;
+	}
+
+	return p - s;
+}
+
+static const char *read_token( const char **p, char *dst, size_t size )
+{
+	skip_whitespace( p );
+
+	unsigned int length = get_token_length( ( *p ) );
+	size_t       i;
+	for ( i = 0; i < length; ++i )
+	{
+		if ( ( i + 1 ) >= size )
+		{
+			break;
+		}
+
+		dst[ i ] = ( *p )[ i ];
+	}
+
+	( *p ) += length;
+
+	dst[ i ] = '\0';
+	return dst;
+}
+
+static unsigned int get_enclosed_string_length( const char *p )
+{
+	skip_whitespace( &p );
+
+	const char *s          = p;
+	bool        isEnclosed = false;
+	if ( *p == '\"' )
+	{
+		p++;
+		isEnclosed = true;
+	}
+
+	while ( NOT_TERMINATING_CHAR( *p ) )
+	{
+		if ( !isEnclosed && ( *p == ' ' || *p == '\t' || *p == '\n' || *p == '\r' ) )
+		{
+			break;
+		}
+		if ( isEnclosed && *p == '\"' )
+		{
+			p++;
+			break;
+		}
+
+		p++;
+	}
+
+	return p - s;
+}
+
+static const char *read_enclosed_string( const char **p, char *dst, size_t size )
+{
+	skip_whitespace( p );
+
+	bool isEnclosed = false;
+	if ( *( *p ) == '\"' )
+	{
+		( *p )++;
+		isEnclosed = true;
+	}
+
+	size_t i = 0;
+	while ( NOT_TERMINATING_CHAR( *( *p ) ) )
+	{
+		if ( !isEnclosed && ( *( *p ) == ' ' || *( *p ) == '\t' || *( *p ) == '\n' || *( *p ) == '\r' ) )
+		{
+			break;
+		}
+
+		if ( isEnclosed && *( *p ) == '\"' )
+		{
+			( *p )++;
+			break;
+		}
+
+		if ( ( i + 1 ) < size )
+		{
+			dst[ i++ ] = *( *p );
+		}
+		( *p )++;
+	}
+
+	dst[ i ] = '\0';
+	return dst;
+}
+
+static unsigned int get_line_length( const char *p )
+{
+	unsigned int length = 0;
+	while ( NOT_TERMINATING_CHAR( *p ) )
+	{
+		length++;
+		p++;
+	}
+
+	return length;
+}
+
+static const char *read_line( const char **p, char *dst, size_t size )
+{
+	unsigned int length = get_line_length( *p );
+	size_t       i;
+	for ( i = 0; i < length; ++i )
+	{
+		if ( ( i + 1 ) >= size )
+		{
+			break;
+		}
+
+		dst[ i ] = ( *p )[ i ];
+	}
+
+	( *p ) += length + get_line_end( ( *p ) + length );
+
+	dst[ i ] = '\0';
+	return dst;
+}
 
 static AcmTokenType get_token_type_for_symbol( const char *symbol )
 {
@@ -61,18 +242,19 @@ static AcmTokenType get_token_type_for_symbol( const char *symbol )
 	return ACM_TOKEN_TYPE_IDENTIFIER;
 }
 
-static void parse_line( const char *p, const char *file, unsigned int lineNum, PLLinkedList *list )
+static void parse_line( const char *p, const char *file, unsigned int lineNum, AcmLexer *lexer )
 {
 	const char *o = p;
 	while ( true )
 	{
-		PlSkipWhitespace( &p );
+		skip_whitespace( &p );
 
 		if ( *p == '\0' )
 		{
 			break;
 		}
-		else if ( *p == ';' )
+
+		if ( *p == ';' )
 		{
 			if ( *( p + 1 ) == '*' )
 			{
@@ -80,8 +262,8 @@ static void parse_line( const char *p, const char *file, unsigned int lineNum, P
 				p += 2;
 				while ( *p != '*' && *( p + 1 ) != ';' )
 				{
-					int l = PlGetLineEndType( p );
-					if ( l != PL_PARSE_NL_INVALID )
+					int l = get_line_end( p );
+					if ( l != -1 )
 					{
 						p += l;
 						continue;
@@ -92,11 +274,9 @@ static void parse_line( const char *p, const char *file, unsigned int lineNum, P
 				p += 2;
 				continue;
 			}
-			else
-			{
-				// single-line comment
-				break;
-			}
+
+			// single-line comment
+			break;
 		}
 
 		AcmTokenType type = ACM_TOKEN_TYPE_INVALID;
@@ -106,9 +286,9 @@ static void parse_line( const char *p, const char *file, unsigned int lineNum, P
 		char        *symbol;
 		if ( *p == '\"' )
 		{
-			symbolSize = PlDetermineEnclosedStringLength( p ) + 1;
-			symbol     = PL_NEW_( char, symbolSize );
-			if ( PlParseEnclosedString( &p, symbol, symbolSize ) == NULL )
+			symbolSize = get_enclosed_string_length( p ) + 1;
+			symbol     = ACM_NEW_( char, symbolSize );
+			if ( read_enclosed_string( &p, symbol, symbolSize ) == NULL )
 			{
 				Warning( "Failed to parse enclosed string: %u:%u\n", lineNum, linePos );
 				break;
@@ -118,9 +298,9 @@ static void parse_line( const char *p, const char *file, unsigned int lineNum, P
 		}
 		else
 		{
-			symbolSize = PlDetermineTokenLength( p ) + 1;
-			symbol     = PL_NEW_( char, symbolSize );
-			if ( PlParseToken( &p, symbol, symbolSize ) == NULL )
+			symbolSize = get_token_length( p ) + 1;
+			symbol     = ACM_NEW_( char, symbolSize );
+			if ( read_token( &p, symbol, symbolSize ) == NULL )
 			{
 				Warning( "Failed to parse token for lexer: %u:%u\n", lineNum, linePos );
 				break;
@@ -151,15 +331,26 @@ static void parse_line( const char *p, const char *file, unsigned int lineNum, P
 
 		if ( type != ACM_TOKEN_TYPE_INVALID )
 		{
-			AcmLexerToken *token = PL_NEW( AcmLexerToken );
+			AcmLexerToken *token = ACM_NEW( AcmLexerToken );
 			snprintf( token->symbol, sizeof( token->symbol ), "%s", symbol );
 			snprintf( token->path, sizeof( token->path ), "%s", file );//TODO: can be simplified!!!
 			token->lineNum = lineNum;
 			token->linePos = linePos;
 			token->type    = type;
-			token->node    = PlInsertLinkedListNode( list, token );
 
-			PL_DELETE( symbol );
+			if ( lexer->end != NULL )
+			{
+				lexer->end->next = token;
+				token->prev      = lexer->end;
+			}
+
+			lexer->end = token;
+			if ( lexer->start == NULL )
+			{
+				lexer->start = lexer->end;
+			}
+
+			ACM_DELETE( symbol );
 		}
 		else
 		{
@@ -172,8 +363,12 @@ AcmLexer *acm_lexer_parse_buffer_( AcmLexer *self, const char *buf, const char *
 {
 	if ( self == NULL )
 	{
-		self         = PL_NEW( AcmLexer );
-		self->tokens = PlCreateLinkedList();
+		self = ACM_NEW( AcmLexer );
+		if ( self == NULL )
+		{
+			return NULL;
+		}
+
 		snprintf( self->originPath, sizeof( self->originPath ), "%s", file );
 	}
 
@@ -195,8 +390,8 @@ AcmLexer *acm_lexer_parse_buffer_( AcmLexer *self, const char *buf, const char *
 				p += 2;
 				while ( *p != '*' && *( p + 1 ) != ';' )
 				{
-					int l = PlGetLineEndType( p );
-					if ( l != PL_PARSE_NL_INVALID )
+					int l = get_line_end( p );
+					if ( l != -1 )
 					{
 						p += l;
 						continue;
@@ -209,24 +404,24 @@ AcmLexer *acm_lexer_parse_buffer_( AcmLexer *self, const char *buf, const char *
 			}
 
 			// single-line comment
-			PlSkipLine( &p );
+			skip_line( &p );
 			continue;
 		}
 
 		// tokenise the line
-		unsigned int bufSize = PlDetermineLineLength( p ) + 1;
+		unsigned int bufSize = get_line_length( p ) + 1;
 		if ( bufSize > 1 )
 		{
-			char *line = PL_NEW_( char, bufSize );
-			PlParseLine( &p, line, bufSize );
+			char *line = ACM_NEW_( char, bufSize );
+			read_line( &p, line, bufSize );
 
-			parse_line( line, file, curLineNum, self->tokens );
+			parse_line( line, file, curLineNum, self );
 
-			PL_DELETE( line );
+			ACM_DELETE( line );
 		}
 		else
 		{
-			PlSkipLine( &p );
+			skip_line( &p );
 		}
 	}
 

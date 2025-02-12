@@ -4,10 +4,20 @@
 
 #pragma once
 
-#include <plcore/pl_linkedlist.h>
-#include <plcore/pl_console.h>
+#include <stdint.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #include "acm/acm.h"
+
+//TODO: do better...
+#if defined( __linux__ )
+#	include <linux/limits.h>
+#endif
+#ifndef PATH_MAX
+#	define PATH_MAX 256
+#endif
 
 /* node structure
  *  string
@@ -27,10 +37,8 @@
  *
  */
 
-extern int nd_LogLevelPrint_;
-#define Message( FORMAT, ... ) PlLogMessage( nd_LogLevelPrint_, FORMAT, ##__VA_ARGS__ )
-extern int nd_LogLevelWarn_;
-#define Warning( FORMAT, ... ) PlLogMessage( nd_LogLevelWarn_, "WARNING: " FORMAT, ##__VA_ARGS__ )
+#define Message( FORMAT, ... ) printf( FORMAT, ##__VA_ARGS__ )
+#define Warning( FORMAT, ... ) printf( "WARNING: " FORMAT, ##__VA_ARGS__ )
 
 /* upper limits used for the parser */
 #define ND_MAX_NAME_LENGTH   256
@@ -50,10 +58,17 @@ typedef struct AcmBranch
 	AcmPropertyType type;
 	AcmPropertyType childType; /* used for array types */
 	NdVarString     data;
-	AcmBranch      *parent;
 
-	PLLinkedListNode *linkedListNode;
-	PLLinkedList     *linkedList;
+	AcmBranch *parent;
+	AcmBranch *prev;
+	AcmBranch *next;
+
+	struct
+	{
+		AcmBranch *start;
+		AcmBranch *end;
+	} children;
+	unsigned int numChildren;
 } AcmBranch;
 
 char      *acm_preprocess_script_( char *buf, size_t *length, bool isHead );
@@ -85,18 +100,21 @@ typedef char AcmSymbolName[ ACM_MAX_SYMBOL_LENGTH ];
 
 typedef struct AcmLexerToken
 {
-	AcmSymbolName     symbol;
-	AcmTokenType      type;
-	PLPath            path;
-	unsigned int      lineNum;
-	unsigned int      linePos;
-	PLLinkedListNode *node;
+	AcmSymbolName symbol;
+	AcmTokenType  type;
+	char          path[ PATH_MAX ];
+	unsigned int  lineNum;
+	unsigned int  linePos;
+
+	struct AcmLexerToken *prev;
+	struct AcmLexerToken *next;
 } AcmLexerToken;
 
 typedef struct AcmLexer
 {
-	PLPath        originPath;
-	PLLinkedList *tokens;
+	char           originPath[ PATH_MAX ];
+	AcmLexerToken *start;
+	AcmLexerToken *end;
 } AcmLexer;
 
 AcmLexer *acm_lexer_parse_buffer_( AcmLexer *self, const char *buf, const char *file );

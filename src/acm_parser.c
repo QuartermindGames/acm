@@ -2,21 +2,7 @@
 // Ape Config Markup
 // Copyright © 2020-2025 Mark E Sowden <hogsy@oldtimes-software.com>
 
-#include <plcore/pl_linkedlist.h>
-
 #include "acm_private.h"
-
-static const AcmLexerToken *get_next_token( const AcmLexerToken *token )
-{
-	AcmLexerToken    *nextToken = NULL;
-	PLLinkedListNode *nextNode  = PlGetNextLinkedListNode( token->node );
-	if ( nextNode != NULL )
-	{
-		nextToken = PlGetLinkedListNodeUserData( nextNode );
-	}
-
-	return nextToken;
-}
 
 typedef struct VariableProcessor
 {
@@ -27,28 +13,28 @@ typedef struct VariableProcessor
 } VariableProcessor;
 
 static VariableProcessor variableProcessors[] = {
-        {"string",  ACM_PROPERTY_TYPE_STRING,  ( AcmTokenType[] ){ ACM_TOKEN_TYPE_STRING, ACM_TOKEN_TYPE_IDENTIFIER }, 2},
-        {"bool",    ACM_PROPERTY_TYPE_BOOL,    ( AcmTokenType[] ){ ACM_TOKEN_TYPE_STRING, ACM_TOKEN_TYPE_IDENTIFIER }, 2},
-        {"uint8",   ND_PROPERTY_UI8,           ( AcmTokenType[] ){ ACM_TOKEN_TYPE_INTEGER },                           1},
-        {"uint16",  ND_PROPERTY_UI16,          ( AcmTokenType[] ){ ACM_TOKEN_TYPE_INTEGER },                           1},
-        {"uint32",  ND_PROPERTY_UI32,          ( AcmTokenType[] ){ ACM_TOKEN_TYPE_INTEGER },                           1},
-        {"uint",    ND_PROPERTY_UI32,          ( AcmTokenType[] ){ ACM_TOKEN_TYPE_INTEGER },                           1}, // shorthand uint32
-        {"uint64",  ND_PROPERTY_UI64,          ( AcmTokenType[] ){ ACM_TOKEN_TYPE_INTEGER },                           1},
-        {"int8",    ND_PROPERTY_INT8,          ( AcmTokenType[] ){ ACM_TOKEN_TYPE_INTEGER },                           1},
-        {"int16",   ND_PROPERTY_INT16,         ( AcmTokenType[] ){ ACM_TOKEN_TYPE_INTEGER },                           1},
-        {"int32",   ND_PROPERTY_INT32,         ( AcmTokenType[] ){ ACM_TOKEN_TYPE_INTEGER },                           1},
-        {"int",     ND_PROPERTY_INT32,         ( AcmTokenType[] ){ ACM_TOKEN_TYPE_INTEGER },                           1}, // shorthand int32
-        {"int64",   ND_PROPERTY_INT64,         ( AcmTokenType[] ){ ACM_TOKEN_TYPE_INTEGER },                           1},
-        {"float",   ACM_PROPERTY_TYPE_FLOAT32, ( AcmTokenType[] ){ ACM_TOKEN_TYPE_INTEGER, ACM_TOKEN_TYPE_DECIMAL },   2},
-        {"float64", ACM_PROPERTY_TYPE_FLOAT64, ( AcmTokenType[] ){ ACM_TOKEN_TYPE_INTEGER, ACM_TOKEN_TYPE_DECIMAL },   2},
+        {"string",       ACM_PROPERTY_TYPE_STRING,  ( AcmTokenType[] ) { ACM_TOKEN_TYPE_STRING, ACM_TOKEN_TYPE_IDENTIFIER }, 2},
+        {"bool",         ACM_PROPERTY_TYPE_BOOL,    ( AcmTokenType[] ) { ACM_TOKEN_TYPE_STRING, ACM_TOKEN_TYPE_IDENTIFIER }, 2},
+        {"uint8",        ND_PROPERTY_UI8,           ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1},
+        {"uint16",       ND_PROPERTY_UI16,          ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1},
+        {"uint32",       ND_PROPERTY_UI32,          ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1},
+        {"unsigned int", ND_PROPERTY_UI32,          ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1}, // shorthand uint32
+        {"uint64",       ND_PROPERTY_UI64,          ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1},
+        {"int8",         ND_PROPERTY_INT8,          ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1},
+        {"int16",        ND_PROPERTY_INT16,         ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1},
+        {"int32",        ND_PROPERTY_INT32,         ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1},
+        {"int",          ND_PROPERTY_INT32,         ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1}, // shorthand int32
+        {"int64",        ND_PROPERTY_INT64,         ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1},
+        {"float",        ACM_PROPERTY_TYPE_FLOAT32, ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER, ACM_TOKEN_TYPE_DECIMAL },   2},
+        {"float64",      ACM_PROPERTY_TYPE_FLOAT64, ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER, ACM_TOKEN_TYPE_DECIMAL },   2},
 };
-#define NUM_VARIABLE_TYPES PL_ARRAY_ELEMENTS( variableProcessors )
+#define NUM_VARIABLE_TYPES ( sizeof( variableProcessors ) / sizeof( *( variableProcessors ) ) )
 
 static AcmBranch *parse_branch_variable( const char *name, const AcmLexerToken *typeToken, const AcmLexerToken *valueToken, AcmBranch *parent, const AcmLexerToken **currentToken )
 {
 	AcmBranch *branch = NULL;
 
-	for ( uint i = 0; i < NUM_VARIABLE_TYPES; ++i )
+	for ( unsigned int i = 0; i < NUM_VARIABLE_TYPES; ++i )
 	{
 		if ( strcmp( typeToken->symbol, variableProcessors[ i ].symbol ) != 0 )
 		{
@@ -56,7 +42,7 @@ static AcmBranch *parse_branch_variable( const char *name, const AcmLexerToken *
 		}
 
 		bool valid = false;
-		for ( uint j = 0; j < variableProcessors[ i ].numTokenTypes; ++j )
+		for ( unsigned int j = 0; j < variableProcessors[ i ].numTokenTypes; ++j )
 		{
 			valid = ( valueToken->type == variableProcessors[ i ].acceptedTokenTypes[ j ] );
 			if ( valid )
@@ -77,7 +63,7 @@ static AcmBranch *parse_branch_variable( const char *name, const AcmLexerToken *
 		break;
 	}
 
-	*currentToken = get_next_token( *currentToken );
+	*currentToken = ( *currentToken )->next;
 	return branch;
 }
 
@@ -93,7 +79,7 @@ static AcmBranch *parse_branch_object( const AcmLexerToken *token, AcmBranch *pa
 			return NULL;
 		}
 
-		peekToken = get_next_token( token );
+		peekToken = token->next;
 	}
 	else
 	{
@@ -108,7 +94,7 @@ static AcmBranch *parse_branch_object( const AcmLexerToken *token, AcmBranch *pa
 
 	AcmBranch *branch = acm_push_object( parent, token->symbol );
 
-	peekToken = get_next_token( peekToken );
+	peekToken = peekToken->next;
 	while ( peekToken != NULL && peekToken->type != ACM_TOKEN_TYPE_CLOSE_BRACKET )
 	{
 		*currentToken = peekToken;
@@ -121,7 +107,7 @@ static AcmBranch *parse_branch_object( const AcmLexerToken *token, AcmBranch *pa
 		Warning( "No closing bracket following object: %u:%u (%s)\n", token->lineNum, token->linePos, token->path );
 	}
 
-	*currentToken = get_next_token( *currentToken );
+	*currentToken = ( *currentToken )->next;
 	return branch;
 }
 
@@ -144,14 +130,14 @@ static AcmBranch *parse_branch_array( const AcmLexerToken *token, AcmBranch *par
 		return NULL;
 	}
 
-	const AcmLexerToken *identifierToken = get_next_token( token );
+	const AcmLexerToken *identifierToken = token->next;
 	if ( identifierToken == NULL || identifierToken->type != ACM_TOKEN_TYPE_IDENTIFIER )
 	{
 		Warning( "Expected identifier to follow typename: %u:%u (%s)\n", token->lineNum, token->linePos, token->path );
 		return NULL;
 	}
 
-	const AcmLexerToken *peekToken = get_next_token( identifierToken );
+	const AcmLexerToken *peekToken = identifierToken->next;
 	if ( peekToken == NULL || peekToken->type != ACM_TOKEN_TYPE_OPEN_BRACKET )
 	{
 		Warning( "No opening bracket following object: %u:%u (%s)\n", token->lineNum, token->linePos, token->path );
@@ -185,7 +171,7 @@ static AcmBranch *parse_branch_array( const AcmLexerToken *token, AcmBranch *par
 
 	AcmBranch *branch = acm_push_new_branch( parent, identifierToken->symbol, ACM_PROPERTY_TYPE_ARRAY, childType );
 
-	peekToken = get_next_token( peekToken );
+	peekToken = peekToken->next;
 	while ( peekToken != NULL && peekToken->type != ACM_TOKEN_TYPE_CLOSE_BRACKET )
 	{
 		*currentToken = peekToken;
@@ -205,13 +191,13 @@ static AcmBranch *parse_branch_array( const AcmLexerToken *token, AcmBranch *par
 		Warning( "No closing bracket following object: %u:%u (%s)\n", token->lineNum, token->linePos, token->path );
 	}
 
-	*currentToken = get_next_token( peekToken );
+	*currentToken = peekToken->next;
 	return branch;
 }
 
 static AcmBranch *parse_branch( const AcmLexerToken *token, AcmBranch *parent, const AcmLexerToken **currentToken )
 {
-	const AcmLexerToken *peekToken = get_next_token( token );
+	const AcmLexerToken *peekToken = token->next;
 
 	if ( token->type != ACM_TOKEN_TYPE_TYPENAME )
 	{
@@ -239,7 +225,7 @@ static AcmBranch *parse_branch( const AcmLexerToken *token, AcmBranch *parent, c
 		{
 			// get the value too
 			const AcmLexerToken *nameToken = *currentToken;
-			*currentToken                  = get_next_token( *currentToken );
+			*currentToken                  = ( *currentToken )->next;
 			if ( *currentToken == NULL )
 			{
 				Warning( "Unexpected end of input for variable: %u:%u (%s)\n", nameToken->lineNum, nameToken->linePos, nameToken->path );
@@ -272,14 +258,13 @@ AcmBranch *acm_parse_buffer( const char *buf, const char *file )
 		return NULL;
 	}
 
-	PLLinkedListNode *firstNode = PlGetFirstNode( lexer->tokens );
-	if ( firstNode != NULL )
+	const AcmLexerToken *token = lexer->start;
+	if ( token != NULL )
 	{
-		const AcmLexerToken *token = PlGetLinkedListNodeUserData( firstNode );
-		root                       = parse_branch( token, NULL, &token );
+		root = parse_branch( token, NULL, &token );
 	}
 
-	PL_DELETE( lexer );
+	ACM_DELETE( lexer );
 
 	return root;
 }
