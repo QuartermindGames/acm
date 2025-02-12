@@ -13,20 +13,20 @@ typedef struct VariableProcessor
 } VariableProcessor;
 
 static VariableProcessor variableProcessors[] = {
-        {"string",       ACM_PROPERTY_TYPE_STRING,  ( AcmTokenType[] ) { ACM_TOKEN_TYPE_STRING, ACM_TOKEN_TYPE_IDENTIFIER }, 2},
-        {"bool",         ACM_PROPERTY_TYPE_BOOL,    ( AcmTokenType[] ) { ACM_TOKEN_TYPE_STRING, ACM_TOKEN_TYPE_IDENTIFIER }, 2},
-        {"uint8",        ND_PROPERTY_UI8,           ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1},
-        {"uint16",       ND_PROPERTY_UI16,          ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1},
-        {"uint32",       ND_PROPERTY_UI32,          ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1},
-        {"unsigned int", ND_PROPERTY_UI32,          ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1}, // shorthand uint32
-        {"uint64",       ND_PROPERTY_UI64,          ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1},
-        {"int8",         ND_PROPERTY_INT8,          ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1},
-        {"int16",        ND_PROPERTY_INT16,         ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1},
-        {"int32",        ND_PROPERTY_INT32,         ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1},
-        {"int",          ND_PROPERTY_INT32,         ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1}, // shorthand int32
-        {"int64",        ND_PROPERTY_INT64,         ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1},
-        {"float",        ACM_PROPERTY_TYPE_FLOAT32, ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER, ACM_TOKEN_TYPE_DECIMAL },   2},
-        {"float64",      ACM_PROPERTY_TYPE_FLOAT64, ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER, ACM_TOKEN_TYPE_DECIMAL },   2},
+        {"string",  ACM_PROPERTY_TYPE_STRING,  ( AcmTokenType[] ) { ACM_TOKEN_TYPE_STRING, ACM_TOKEN_TYPE_IDENTIFIER }, 2},
+        {"bool",    ACM_PROPERTY_TYPE_BOOL,    ( AcmTokenType[] ) { ACM_TOKEN_TYPE_STRING, ACM_TOKEN_TYPE_IDENTIFIER }, 2},
+        {"uint8",   ND_PROPERTY_UI8,           ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1},
+        {"uint16",  ND_PROPERTY_UI16,          ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1},
+        {"uint32",  ND_PROPERTY_UI32,          ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1},
+        {"uint",    ND_PROPERTY_UI32,          ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1}, // shorthand uint32
+        {"uint64",  ND_PROPERTY_UI64,          ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1},
+        {"int8",    ND_PROPERTY_INT8,          ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1},
+        {"int16",   ND_PROPERTY_INT16,         ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1},
+        {"int32",   ND_PROPERTY_INT32,         ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1},
+        {"int",     ND_PROPERTY_INT32,         ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1}, // shorthand int32
+        {"int64",   ND_PROPERTY_INT64,         ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1},
+        {"float",   ACM_PROPERTY_TYPE_FLOAT32, ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER, ACM_TOKEN_TYPE_DECIMAL },   2},
+        {"float64", ACM_PROPERTY_TYPE_FLOAT64, ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER, ACM_TOKEN_TYPE_DECIMAL },   2},
 };
 #define NUM_VARIABLE_TYPES ( sizeof( variableProcessors ) / sizeof( *( variableProcessors ) ) )
 
