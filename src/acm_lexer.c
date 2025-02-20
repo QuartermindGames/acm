@@ -332,8 +332,8 @@ static void parse_line( const char *p, const char *file, unsigned int lineNum, A
 		if ( type != ACM_TOKEN_TYPE_INVALID )
 		{
 			AcmLexerToken *token = ACM_NEW( AcmLexerToken );
-			snprintf( token->symbol, sizeof( token->symbol ), "%s", symbol );
 			snprintf( token->path, sizeof( token->path ), "%s", file );//TODO: can be simplified!!!
+			token->symbol  = symbol;
 			token->lineNum = lineNum;
 			token->linePos = linePos;
 			token->type    = type;
@@ -349,8 +349,6 @@ static void parse_line( const char *p, const char *file, unsigned int lineNum, A
 			{
 				lexer->start = lexer->end;
 			}
-
-			ACM_DELETE( symbol );
 		}
 		else
 		{

@@ -258,10 +258,20 @@ AcmBranch *acm_parse_buffer( const char *buf, const char *file )
 		return NULL;
 	}
 
-	const AcmLexerToken *token = lexer->start;
+	AcmLexerToken *token = lexer->start;
 	if ( token != NULL )
 	{
-		root = parse_branch( token, NULL, &token );
+		root = parse_branch( token, NULL, ( const AcmLexerToken ** ) &token );
+
+		// delete all the tokens
+		token = lexer->start;
+		while ( token != NULL )
+		{
+			AcmLexerToken *nextToken = token->next;
+			ACM_DELETE( token->symbol );
+			ACM_DELETE( token );
+			token = nextToken;
+		}
 	}
 
 	ACM_DELETE( lexer );

@@ -622,7 +622,7 @@ AcmBranch *acm_push_bool( AcmBranch *parent, const char *name, bool var )
 
 AcmBranch *acm_push_i8( AcmBranch *parent, const char *name, int8_t var )
 {
-	char buf[ 4 ];
+	char buf[ 8 ];
 	snprintf( buf, sizeof( buf ), "%" PRId8, var );
 	return acm_push_variable_( parent, name, buf, ND_PROPERTY_INT8 );
 }

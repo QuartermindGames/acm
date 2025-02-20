@@ -40,12 +40,6 @@
 #define Message( FORMAT, ... ) printf( FORMAT, ##__VA_ARGS__ )
 #define Warning( FORMAT, ... ) printf( "WARNING: " FORMAT, ##__VA_ARGS__ )
 
-/* upper limits used for the parser */
-#define ND_MAX_NAME_LENGTH   256
-#define ND_MAX_STRING_LENGTH 256
-#define ND_MAX_BOOL_LENGTH   8 /* 0, 1, true, false */
-#define ND_MAX_TYPE_LENGTH   16
-
 typedef struct NdVarString
 {
 	char    *buf;
@@ -100,11 +94,11 @@ typedef char AcmSymbolName[ ACM_MAX_SYMBOL_LENGTH ];
 
 typedef struct AcmLexerToken
 {
-	AcmSymbolName symbol;
-	AcmTokenType  type;
-	char          path[ PATH_MAX ];
-	unsigned int  lineNum;
-	unsigned int  linePos;
+	char        *symbol;
+	AcmTokenType type;
+	char         path[ PATH_MAX ];
+	unsigned int lineNum;
+	unsigned int linePos;
 
 	struct AcmLexerToken *prev;
 	struct AcmLexerToken *next;
