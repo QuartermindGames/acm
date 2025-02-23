@@ -7,6 +7,7 @@
 
 #include "acm_private.h"
 
+#include <ctype.h>
 #include <inttypes.h>
 
 #define ACM_FORMAT_UTF8_HEADER "node.utf8\n"
@@ -496,9 +497,25 @@ int16_t *acm_get_array_i16( AcmBranch *branch, const char *name, int16_t *destin
 	return destination;
 }
 
+static int acm_strcasecmp( const char *s1, const char *s2 )
+{
+	const unsigned char *us1 = ( const unsigned char * ) s1;
+	const unsigned char *us2 = ( const unsigned char * ) s2;
+
+	while ( tolower( *us1 ) == tolower( *us2++ ) )
+	{
+		if ( *us1++ == '\0' )
+		{
+			return 0;
+		}
+	}
+
+	return tolower( *us1 ) - tolower( *--us2 );
+}
+
 AcmBranch *acm_linear_lookup( AcmBranch *root, const char *name )
 {
-	if ( root->name.buf != NULL && strcasecmp( root->name.buf, name ) == 0 )
+	if ( root->name.buf != NULL && acm_strcasecmp( root->name.buf, name ) == 0 )
 	{
 		return root;
 	}
