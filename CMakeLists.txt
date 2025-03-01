@@ -1,3 +1,10 @@
+cmake_minimum_required(VERSION 3.23)
+
+project(acm
+        DESCRIPTION "ACM (Ape Config Markup)."
+        LANGUAGES C
+)
+
 set(CMAKE_C_STANDARD 11)
 
 file(GLOB ACM_SOURCE_FILES

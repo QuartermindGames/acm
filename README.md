@@ -6,6 +6,12 @@ I originally outlined this spec back in early 2020 before the pandemic, but it's
 
 This is mainly developed for ApeTech (my 3D engine), but I've published it in the hopes it might be useful for others. Generally, the implementation I've got here needs a lot of TLC; it's pretty much just been developed to a point where it works, and I've had to move onto other things.
 
+<div align="center">
+
+[Features](#features) | [Syntax](#syntax) | [Compiling](#compiling)
+
+</div>
+
 ## Features
 * Supports comments
 * Arrays
@@ -76,3 +82,8 @@ generating a more optimal output for the binary version of the format.
 - `uint32`
 - `uint64`
 - `float64`
+
+## Compiling
+
+I've yet to build this for Windows (Linux is my daily driver), and certainly not against MSVC.
+My recommendation for now is to use GCC/Clang if you can and I'll look at this hopefully soon.
