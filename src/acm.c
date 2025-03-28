@@ -10,7 +10,7 @@
 #include <ctype.h>
 #include <inttypes.h>
 
-#define ACM_FORMAT_UTF8_HEADER "node.utf8\n"
+#define ACM_FORMAT_UTF8_HEADER "node.utf8"
 
 #define ACM_FORMAT_BINARY_HEADER   "node.bin\n" // original format w/ no versioning support (defaults to 1)
 #define ACM_FORMAT_BINARY_HEADER_2 "node.binx\n"// new format w/ versioning support
@@ -1436,7 +1436,7 @@ bool acm_write_file( const char *path, AcmBranch *root, AcmFileType fileType )
 	else
 	{
 		sDepth = 0;
-		fprintf( file, ACM_FORMAT_UTF8_HEADER "; this node file has been auto-generated!\n" );
+		fprintf( file, ACM_FORMAT_UTF8_HEADER "\n; this node file has been auto-generated!\n" );
 	}
 
 	serialize_node( file, root, fileType );
