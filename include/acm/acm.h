@@ -16,10 +16,13 @@ extern "C"
 	// override these if you want to provide your own alloc methods
 	// just mind that ACM expects memory to be zero'd!!
 #ifndef ACM_NEW_
-#	define ACM_NEW_( TYPE, NUM ) calloc( NUM, sizeof( TYPE ) )
+#	define ACM_NEW_( TYPE, NUM ) ( TYPE * ) calloc( NUM, sizeof( TYPE ) )
 #endif
 #ifndef ACM_NEW
 #	define ACM_NEW( TYPE ) ACM_NEW_( TYPE, 1 )
+#endif
+#ifndef ACM_REALLOC
+#	define ACM_REALLOC( PTR, TYPE, NUM ) ( TYPE * ) realloc( PTR, NUM * sizeof( TYPE ) )
 #endif
 #ifndef ACM_DELETE
 #	define ACM_DELETE( PTR ) free( PTR )
@@ -147,6 +150,8 @@ extern "C"
 	AcmBranch *acm_push_array_i32( AcmBranch *parent, const char *name, const int32_t *array, unsigned int numElements );
 	AcmBranch *acm_push_array_ui32( AcmBranch *parent, const char *name, const uint32_t *array, unsigned int numElements );
 	AcmBranch *acm_push_array_f32( AcmBranch *parent, const char *name, const float *array, unsigned int numElements );
+
+	bool acm_set_variable( AcmBranch *root, const char *name, const char *value, AcmPropertyType type, bool createOnFail );
 
 	/**
 	 * Returns a copy of the given branch, inc. all its children.

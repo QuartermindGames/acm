@@ -40,18 +40,18 @@
 #define Message( FORMAT, ... ) printf( FORMAT, ##__VA_ARGS__ )
 #define Warning( FORMAT, ... ) printf( "WARNING: " FORMAT, ##__VA_ARGS__ )
 
-typedef struct NdVarString
+typedef struct AcmString
 {
 	char    *buf;
-	uint16_t length;
-} NdVarString;
+	uint16_t bufSize;// including null-terminator
+} AcmString;
 
 typedef struct AcmBranch
 {
-	NdVarString     name;
+	AcmString       name;
 	AcmPropertyType type;
 	AcmPropertyType childType; /* used for array types */
-	NdVarString     data;
+	AcmString       data;
 
 	AcmBranch *parent;
 	AcmBranch *prev;
