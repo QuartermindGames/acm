@@ -27,6 +27,30 @@ are supported.
 - `bin` (**deprecated**)
 - `binx`
 
+Below is an example of how you might setup a material using ACM.
+
+```
+node.utf8
+object material
+{
+	bool castShadows false
+	array object passes
+	{
+        	{
+			array float textureScroll { 0.1 0.0 }
+			array string blendMode { one one }
+			string shaderProgram default
+			object shaderParameters
+			{
+				string diffuseMap materials/world/gradients/gradient_complex_yellow.png
+			}
+		}
+	}
+}
+```
+
+Or alternatively, how you might define a project.
+
 ``` 
 node.utf8
 object project {
@@ -86,4 +110,4 @@ generating a more optimal output for the binary version of the format.
 ## Compiling
 
 I've yet to build this for Windows (Linux is my daily driver), and certainly not against MSVC.
-My recommendation for now is to use GCC/Clang if you can and I'll look at this hopefully soon.
+My recommendation for now is to use GCC/Clang if you can, and I'll look at this hopefully soon.
