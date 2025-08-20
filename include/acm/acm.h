@@ -114,10 +114,10 @@ extern "C"
 	float  acm_get_f32( AcmBranch *node, const char *name, float fallback );
 	double acm_get_f64( AcmBranch *node, const char *name, double fallback );
 
-	intmax_t  acm_branch_get_child_int( AcmBranch *root, const char *name, intmax_t fallback );
+	intmax_t  acm_get_int( AcmBranch *root, const char *name, intmax_t fallback );
 	uintmax_t acm_get_uint( AcmBranch *root, const char *name, uintmax_t fallback );
 
-#define ACM_GET_INT( VAR, ROOT, NAME, FALLBACK )  ( typeof( ( VAR ) ) ) acm_branch_get_child_int( ( ROOT ), ( NAME ), ( FALLBACK ) )
+#define ACM_GET_INT( VAR, ROOT, NAME, FALLBACK )  ( typeof( ( VAR ) ) ) acm_get_int( ( ROOT ), ( NAME ), ( FALLBACK ) )
 #define ACM_GET_UINT( VAR, ROOT, NAME, FALLBACK ) ( typeof( ( VAR ) ) ) acm_get_uint( ( ROOT ), ( NAME ), ( FALLBACK ) )
 
 	AcmErrorCode acm_branch_get_bool_array( AcmBranch *self, bool *buf, unsigned int numElements );

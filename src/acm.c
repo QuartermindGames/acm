@@ -477,7 +477,7 @@ double acm_get_f64( AcmBranch *node, const char *name, double fallback )
 	return ( var != NULL ) ? strtod( var->buf, NULL ) : fallback;
 }
 
-intmax_t acm_branch_get_child_int( AcmBranch *root, const char *name, intmax_t fallback )
+intmax_t acm_get_int( AcmBranch *root, const char *name, intmax_t fallback )
 {
 	const AcmString *var = get_value_by_name( root, name );
 	return ( var != NULL ) ? strtoll( var->buf, NULL, 10 ) : fallback;
