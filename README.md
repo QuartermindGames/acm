@@ -1,4 +1,4 @@
-# ACM (Ape Config Markup)
+# ACM (Another Config Markup)
 
 When developing my own 3D engine, I was originally looking to use JSON but wasn't a huge fan of it—it didn't seem designed very well for human interaction. This was one of the things that led onto me developing ACM.
 
