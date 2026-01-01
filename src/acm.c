@@ -149,8 +149,19 @@ AcmPropertyType acm_branch_get_type( const AcmBranch *self )
 	return self->type;
 }
 
+const char *acm_branch_get_value( const AcmBranch *self, uint16_t *size )
+{
+	if ( size != NULL )
+	{
+		*size = self->data.bufSize;
+	}
+	return self->data.buf;
+}
+
 AcmErrorCode acm_branch_get_string( const AcmBranch *self, char *dest, size_t length )
 {
+	//TODO: why isn't this just returning the buf!?
+	//		if we can resolve this, it'll negate the need for get_value
 	if ( self->type != ACM_PROPERTY_TYPE_STRING ) return ND_ERROR_INVALID_TYPE;
 	snprintf( dest, length, "%s", self->data.buf );
 	return ND_ERROR_SUCCESS;

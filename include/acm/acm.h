@@ -95,6 +95,15 @@ extern "C"
 	const char     *acm_branch_get_name( const AcmBranch *self );
 	AcmPropertyType acm_branch_get_type( const AcmBranch *self );
 
+	/**
+	 * Returns the raw value, with no type validation.
+	 * Conversion, if necessary, is left to the caller.
+	 *
+	 * @param self	Branch instance.
+	 * @param size	Returns the size of the buffer. Optional.
+	 */
+	const char *acm_branch_get_value( const AcmBranch *self, uint16_t *size );
+
 	AcmErrorCode acm_branch_get_bool( const AcmBranch *self, bool *dest );
 	AcmErrorCode acm_branch_get_string( const AcmBranch *self, char *dest, size_t length );
 	AcmErrorCode acm_branch_get_float32( const AcmBranch *self, float *dest );
