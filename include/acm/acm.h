@@ -148,6 +148,7 @@ extern "C"
 	AcmBranch *acm_push_bool( AcmBranch *parent, const char *name, bool var );
 	AcmBranch *acm_push_i8( AcmBranch *parent, const char *name, int8_t var );
 	AcmBranch *acm_push_i16( AcmBranch *parent, const char *name, int16_t var );
+	AcmBranch *acm_push_ui16( AcmBranch *parent, const char *name, uint16_t var );
 	AcmBranch *acm_push_i32( AcmBranch *parent, const char *name, int32_t var );
 	AcmBranch *acm_push_ui32( AcmBranch *parent, const char *name, uint32_t var );
 	AcmBranch *acm_push_f32( AcmBranch *parent, const char *name, float var );

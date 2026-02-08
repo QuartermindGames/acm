@@ -670,6 +670,13 @@ AcmBranch *acm_push_i16( AcmBranch *parent, const char *name, int16_t var )
 	return acm_push_variable_( parent, name, buf, ND_PROPERTY_INT16 );
 }
 
+AcmBranch *acm_push_ui16( AcmBranch *parent, const char *name, uint16_t var )
+{
+	char buf[ 32 ];
+	snprintf( buf, sizeof( buf ), "%" PRIu16, var );
+	return acm_push_variable_( parent, name, buf, ND_PROPERTY_UI16 );
+}
+
 AcmBranch *acm_push_i32( AcmBranch *parent, const char *name, int32_t var )
 {
 	char buf[ 32 ];
