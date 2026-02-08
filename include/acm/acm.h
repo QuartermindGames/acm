@@ -22,7 +22,7 @@ extern "C"
 #	define ACM_NEW( TYPE ) ACM_NEW_( TYPE, 1 )
 #endif
 #ifndef ACM_REALLOC
-#	define ACM_REALLOC( PTR, TYPE, NUM ) ( TYPE * ) realloc( PTR, NUM * sizeof( TYPE ) )
+#	define ACM_REALLOC( PTR, TYPE, NUM ) ( TYPE * ) realloc( PTR, ( NUM ) * sizeof( TYPE ) )
 #endif
 #ifndef ACM_DELETE
 #	define ACM_DELETE( PTR ) free( PTR )
@@ -58,6 +58,8 @@ extern "C"
 		ACM_FILE_TYPE_UTF8,
 	} AcmFileType;
 
+	// Mind changing the order of the below,
+	// as you will break binary compatibility when doing so!!
 	typedef enum AcmPropertyType
 	{
 		ACM_PROPERTY_TYPE_INVALID = -1,
@@ -79,6 +81,8 @@ extern "C"
 		ND_PROPERTY_UI16,         // uint16
 		ND_PROPERTY_UI32,         // uint32
 		ND_PROPERTY_UI64,         // uint64
+
+		ACM_PROPERTY_TYPE_FLOAT16,
 
 		ACM_MAX_PROPERTY_TYPES
 	} AcmPropertyType;
@@ -106,6 +110,7 @@ extern "C"
 
 	AcmErrorCode acm_branch_get_bool( const AcmBranch *self, bool *dest );
 	AcmErrorCode acm_branch_get_string( const AcmBranch *self, char *dest, size_t length );
+	AcmErrorCode acm_branch_get_float16( const AcmBranch *self, _Float16 *dest );
 	AcmErrorCode acm_branch_get_float32( const AcmBranch *self, float *dest );
 	AcmErrorCode acm_branch_get_float64( const AcmBranch *self, double *dest );
 	AcmErrorCode acm_branch_get_int8( const AcmBranch *self, int8_t *dest );
@@ -151,6 +156,7 @@ extern "C"
 	AcmBranch *acm_push_ui16( AcmBranch *parent, const char *name, uint16_t var );
 	AcmBranch *acm_push_i32( AcmBranch *parent, const char *name, int32_t var );
 	AcmBranch *acm_push_ui32( AcmBranch *parent, const char *name, uint32_t var );
+	AcmBranch *acm_push_f16( AcmBranch *parent, const char *name, _Float16 var );
 	AcmBranch *acm_push_f32( AcmBranch *parent, const char *name, float var );
 	AcmBranch *acm_push_f64( AcmBranch *parent, const char *name, double var );
 
@@ -159,6 +165,7 @@ extern "C"
 	AcmBranch *acm_push_array_i16( AcmBranch *root, const char *name, const int16_t *array, unsigned int numElements );
 	AcmBranch *acm_push_array_i32( AcmBranch *parent, const char *name, const int32_t *array, unsigned int numElements );
 	AcmBranch *acm_push_array_ui32( AcmBranch *parent, const char *name, const uint32_t *array, unsigned int numElements );
+	AcmBranch *acm_push_array_f16( AcmBranch *parent, const char *name, const _Float16 *array, unsigned int numElements );
 	AcmBranch *acm_push_array_f32( AcmBranch *parent, const char *name, const float *array, unsigned int numElements );
 
 	bool acm_set_variable( AcmBranch *root, const char *name, const char *value, AcmPropertyType type, bool createOnFail );

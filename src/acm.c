@@ -33,6 +33,7 @@ static const char *string_for_property_type( AcmPropertyType propertyType )
 	        [ND_PROPERTY_UI16]          = "uint16",
 	        [ND_PROPERTY_UI32]          = "uint32",
 	        [ND_PROPERTY_UI64]          = "uint64",
+	        [ACM_PROPERTY_TYPE_FLOAT16] = "float16",
 	        [ACM_PROPERTY_TYPE_FLOAT32] = "float",
 	        [ACM_PROPERTY_TYPE_FLOAT64] = "float64",
 	};
@@ -184,6 +185,13 @@ AcmErrorCode acm_branch_get_bool( const AcmBranch *self, bool *dest )
 
 	set_error_message( ND_ERROR_INVALID_ARGUMENT, "invalid data passed from var" );
 	return ND_ERROR_INVALID_ARGUMENT;
+}
+
+AcmErrorCode acm_branch_get_float16( const AcmBranch *self, _Float16 *dest )
+{
+	if ( self->type != ACM_PROPERTY_TYPE_FLOAT16 ) return ND_ERROR_INVALID_TYPE;
+	*dest = strtof( self->data.buf, NULL );
+	return ND_ERROR_SUCCESS;
 }
 
 AcmErrorCode acm_branch_get_float32( const AcmBranch *self, float *dest )
@@ -485,7 +493,7 @@ double acm_get_f64( AcmBranch *node, const char *name, double fallback )
 {
 	/* todo: warning on fail */
 	const AcmString *var = get_value_by_name( node, name );
-	return ( var != NULL ) ? strtod( var->buf, NULL ) : fallback;
+	return var != NULL ? strtod( var->buf, NULL ) : fallback;
 }
 
 intmax_t acm_get_int( AcmBranch *root, const char *name, intmax_t fallback )
@@ -691,6 +699,13 @@ AcmBranch *acm_push_ui32( AcmBranch *parent, const char *name, uint32_t var )
 	return acm_push_variable_( parent, name, buf, ND_PROPERTY_UI32 );
 }
 
+AcmBranch *acm_push_f16( AcmBranch *parent, const char *name, _Float16 var )
+{
+	char buf[ 32 ];
+	snprintf( buf, sizeof( buf ), "%f", ( double ) var );
+	return acm_push_variable_( parent, name, buf, ACM_PROPERTY_TYPE_FLOAT16 );
+}
+
 AcmBranch *acm_push_f32( AcmBranch *parent, const char *name, float var )
 {
 	char buf[ 32 ];
@@ -739,6 +754,19 @@ AcmBranch *acm_push_array_ui32( AcmBranch *parent, const char *name, const uint3
 		for ( unsigned int i = 0; i < numElements; ++i )
 		{
 			acm_push_ui32( node, NULL, array[ i ] );
+		}
+	}
+	return node;
+}
+
+AcmBranch *acm_push_array_f16( AcmBranch *parent, const char *name, const _Float16 *array, unsigned int numElements )
+{
+	AcmBranch *node = acm_push_new_branch( parent, name, ACM_PROPERTY_TYPE_ARRAY, ACM_PROPERTY_TYPE_FLOAT16 );
+	if ( node != NULL )
+	{
+		for ( unsigned int i = 0; i < numElements; ++i )
+		{
+			acm_push_f16( node, NULL, array[ i ] );
 		}
 	}
 	return node;
@@ -1003,6 +1031,7 @@ static AcmBranch *deserialize_binary_node( const void **buf, size_t *bufSize, Ac
 		case ND_PROPERTY_UI8:
 			typeSize = sizeof( uint8_t );
 			break;
+		case ACM_PROPERTY_TYPE_FLOAT16:
 		case ACM_PROPERTY_TYPE_STRING:
 		case ND_PROPERTY_INT16:
 		case ND_PROPERTY_UI16:
@@ -1065,38 +1094,45 @@ static AcmBranch *deserialize_binary_node( const void **buf, size_t *bufSize, Ac
 			alloc_var_string( *( ( bool * ) data ) ? "true" : "false", &node->data );
 			break;
 		}
+		case ACM_PROPERTY_TYPE_FLOAT16:
+		{
+			char str[ 32 ];
+			snprintf( str, sizeof( str ), "%f", ( double ) *( _Float16 * ) data );
+			alloc_var_string( str, &node->data );
+			break;
+		}
 		case ACM_PROPERTY_TYPE_FLOAT32:
 		{
 			char str[ 32 ];
-			snprintf( str, sizeof( str ), "%f", *( ( float * ) data ) );
+			snprintf( str, sizeof( str ), "%f", *( float * ) data );
 			alloc_var_string( str, &node->data );
 			break;
 		}
 		case ACM_PROPERTY_TYPE_FLOAT64:
 		{
 			char str[ 32 ];
-			snprintf( str, sizeof( str ), "%lf", *( ( double * ) data ) );
+			snprintf( str, sizeof( str ), "%lf", *( double * ) data );
 			alloc_var_string( str, &node->data );
 			break;
 		}
 		case ND_PROPERTY_UI8:
 		{
 			char str[ 32 ];
-			snprintf( str, sizeof( str ), "%" PRIu8, *( ( uint8_t * ) data ) );
+			snprintf( str, sizeof( str ), "%" PRIu8, *( uint8_t * ) data );
 			alloc_var_string( str, &node->data );
 			break;
 		}
 		case ND_PROPERTY_INT8:
 		{
 			char str[ 32 ];
-			snprintf( str, sizeof( str ), "%" PRId8, *( ( int8_t * ) data ) );
+			snprintf( str, sizeof( str ), "%" PRId8, *( int8_t * ) data );
 			alloc_var_string( str, &node->data );
 			break;
 		}
 		case ND_PROPERTY_UI16:
 		{
 			char str[ 32 ];
-			snprintf( str, sizeof( str ), "%" PRIu16, *( ( uint16_t * ) data ) );
+			snprintf( str, sizeof( str ), "%" PRIu16, *( uint16_t * ) data );
 			alloc_var_string( str, &node->data );
 			// slapped on fix for a bug with serialisation in older versions
 			if ( version < 2 )
@@ -1108,7 +1144,7 @@ static AcmBranch *deserialize_binary_node( const void **buf, size_t *bufSize, Ac
 		case ND_PROPERTY_INT16:
 		{
 			char str[ 32 ];
-			snprintf( str, sizeof( str ), "%" PRId16, *( ( int16_t * ) data ) );
+			snprintf( str, sizeof( str ), "%" PRId16, *( int16_t * ) data );
 			alloc_var_string( str, &node->data );
 			// slapped on fix for a bug with serialisation in older versions
 			if ( version < 2 )
@@ -1120,28 +1156,28 @@ static AcmBranch *deserialize_binary_node( const void **buf, size_t *bufSize, Ac
 		case ND_PROPERTY_UI32:
 		{
 			char str[ 32 ];
-			snprintf( str, sizeof( str ), "%" PRIu32, *( ( uint32_t * ) data ) );
+			snprintf( str, sizeof( str ), "%" PRIu32, *( uint32_t * ) data );
 			alloc_var_string( str, &node->data );
 			break;
 		}
 		case ND_PROPERTY_INT32:
 		{
 			char str[ 32 ];
-			snprintf( str, sizeof( str ), "%" PRId32, *( ( int32_t * ) data ) );
+			snprintf( str, sizeof( str ), "%" PRId32, *( int32_t * ) data );
 			alloc_var_string( str, &node->data );
 			break;
 		}
 		case ND_PROPERTY_UI64:
 		{
 			char str[ 32 ];
-			snprintf( str, sizeof( str ), "%" PRIu64, *( ( uint64_t * ) data ) );
+			snprintf( str, sizeof( str ), "%" PRIu64, *( uint64_t * ) data );
 			alloc_var_string( str, &node->data );
 			break;
 		}
 		case ND_PROPERTY_INT64:
 		{
 			char str[ 32 ];
-			snprintf( str, sizeof( str ), "%" PRId64, *( ( int64_t * ) data ) );
+			snprintf( str, sizeof( str ), "%" PRId64, *( int64_t * ) data );
 			alloc_var_string( str, &node->data );
 			break;
 		}
@@ -1380,6 +1416,13 @@ static void serialize_node( FILE *file, AcmBranch *node, AcmFileType fileType )
 			Warning( "Invalid node type: %u/n", node->type );
 			//TODO: don't do this!!!
 			abort();
+		}
+		case ACM_PROPERTY_TYPE_FLOAT16:
+		{
+			_Float16 v;
+			acm_branch_get_float16( node, &v );
+			fwrite( &v, sizeof( _Float16 ), 1, file );
+			break;
 		}
 		case ACM_PROPERTY_TYPE_FLOAT32:
 		{

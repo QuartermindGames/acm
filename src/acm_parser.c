@@ -25,6 +25,7 @@ static VariableProcessor variableProcessors[] = {
         {"int32",   ND_PROPERTY_INT32,         ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1},
         {"int",     ND_PROPERTY_INT32,         ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1}, // shorthand int32
         {"int64",   ND_PROPERTY_INT64,         ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER },                           1},
+        {"float16", ACM_PROPERTY_TYPE_FLOAT16, ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER, ACM_TOKEN_TYPE_DECIMAL },   2},
         {"float",   ACM_PROPERTY_TYPE_FLOAT32, ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER, ACM_TOKEN_TYPE_DECIMAL },   2},
         {"float64", ACM_PROPERTY_TYPE_FLOAT64, ( AcmTokenType[] ) { ACM_TOKEN_TYPE_INTEGER, ACM_TOKEN_TYPE_DECIMAL },   2},
 };
