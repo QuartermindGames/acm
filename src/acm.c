@@ -1615,7 +1615,7 @@ void acm_print_tree( AcmBranch *self, int index )
 
 #if defined( ACM_TEST )
 
-int main( PL_UNUSED int argc, PL_UNUSED char **argv )
+int main( int argc, char **argv )
 {
 	PlInitialize( argc, argv );
 
