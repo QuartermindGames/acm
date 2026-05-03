@@ -187,12 +187,14 @@ AcmErrorCode acm_branch_get_bool( const AcmBranch *self, bool *dest )
 	return ND_ERROR_INVALID_ARGUMENT;
 }
 
+#ifdef ACM_SUPPORT_FLT16
 AcmErrorCode acm_branch_get_float16( const AcmBranch *self, _Float16 *dest )
 {
 	if ( self->type != ACM_PROPERTY_TYPE_FLOAT16 ) return ND_ERROR_INVALID_TYPE;
 	*dest = strtof( self->data.buf, NULL );
 	return ND_ERROR_SUCCESS;
 }
+#endif
 
 AcmErrorCode acm_branch_get_float32( const AcmBranch *self, float *dest )
 {
@@ -706,12 +708,14 @@ AcmBranch *acm_push_ui32( AcmBranch *parent, const char *name, uint32_t var )
 	return acm_push_variable_( parent, name, buf, ND_PROPERTY_UI32 );
 }
 
+#ifdef ACM_SUPPORT_FLT16
 AcmBranch *acm_push_f16( AcmBranch *parent, const char *name, _Float16 var )
 {
 	char buf[ 32 ];
 	snprintf( buf, sizeof( buf ), "%f", ( double ) var );
 	return acm_push_variable_( parent, name, buf, ACM_PROPERTY_TYPE_FLOAT16 );
 }
+#endif
 
 AcmBranch *acm_push_f32( AcmBranch *parent, const char *name, float var )
 {
@@ -766,6 +770,7 @@ AcmBranch *acm_push_array_ui32( AcmBranch *parent, const char *name, const uint3
 	return node;
 }
 
+#ifdef ACM_SUPPORT_FLT16
 AcmBranch *acm_push_array_f16( AcmBranch *parent, const char *name, const _Float16 *array, unsigned int numElements )
 {
 	AcmBranch *node = acm_push_new_branch( parent, name, ACM_PROPERTY_TYPE_ARRAY, ACM_PROPERTY_TYPE_FLOAT16 );
@@ -778,6 +783,7 @@ AcmBranch *acm_push_array_f16( AcmBranch *parent, const char *name, const _Float
 	}
 	return node;
 }
+#endif
 
 AcmBranch *acm_push_array_f32( AcmBranch *parent, const char *name, const float *array, unsigned int numElements )
 {
@@ -1101,6 +1107,7 @@ static AcmBranch *deserialize_binary_node( const void **buf, size_t *bufSize, Ac
 			alloc_var_string( *( ( bool * ) data ) ? "true" : "false", &node->data );
 			break;
 		}
+#ifdef ACM_SUPPORT_FLT16
 		case ACM_PROPERTY_TYPE_FLOAT16:
 		{
 			char str[ 32 ];
@@ -1108,6 +1115,7 @@ static AcmBranch *deserialize_binary_node( const void **buf, size_t *bufSize, Ac
 			alloc_var_string( str, &node->data );
 			break;
 		}
+#endif
 		case ACM_PROPERTY_TYPE_FLOAT32:
 		{
 			char str[ 32 ];
@@ -1424,6 +1432,7 @@ static void serialize_node( FILE *file, AcmBranch *node, AcmFileType fileType )
 			//TODO: don't do this!!!
 			abort();
 		}
+#ifdef ACM_SUPPORT_FLT16
 		case ACM_PROPERTY_TYPE_FLOAT16:
 		{
 			_Float16 v;
@@ -1431,6 +1440,7 @@ static void serialize_node( FILE *file, AcmBranch *node, AcmFileType fileType )
 			fwrite( &v, sizeof( _Float16 ), 1, file );
 			break;
 		}
+#endif
 		case ACM_PROPERTY_TYPE_FLOAT32:
 		{
 			float v;
