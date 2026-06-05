@@ -10,7 +10,7 @@
 
 #define __STDC_WANT_IEC_60559_TYPES_EXT__
 #include <float.h>
-#ifdef FLT16_MIN
+#if defined( FLT16_MIN ) || __STDC_VERSION__ > 201710L
 #	define ACM_SUPPORT_FLT16
 #endif
 

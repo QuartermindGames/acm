@@ -433,7 +433,7 @@ AcmLexer *acm_lexer_parse_buffer_( AcmLexer *self, const char *buf, const char *
 	}
 
 	double endTime = PlGetCurrentSeconds();
-	printf( "Lexer took " PL_FMT_double "s for \"%s\"\n", endTime - startTime, file );
+	printf( "Lexer took %lfs for \"%s\"\n", endTime - startTime, file );
 #endif
 
 	return self;
