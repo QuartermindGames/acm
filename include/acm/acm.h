@@ -246,7 +246,7 @@ extern "C"
 	void acm_print_tree( AcmBranch *self, int index );
 
 #define ACM_ITERATE_BRANCH( LIST, ITR ) for ( AcmBranch * ( ITR ) = acm_get_first_child( LIST ); \
-	                                          ( ITR ) != nullptr;                                \
+	                                          ( ITR ) != NULL;                                   \
 	                                          ( ITR ) = acm_get_next_child( ( ITR ) ) )
 
 #if defined( __cplusplus )
