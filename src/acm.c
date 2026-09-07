@@ -4,11 +4,10 @@
 
 #include <stdarg.h>
 #include <stdio.h>
-
-#include "acm_private.h"
-
 #include <ctype.h>
 #include <inttypes.h>
+
+#include "acm_private.h"
 
 #define ACM_FORMAT_UTF8_HEADER "node.utf8"
 
@@ -18,21 +17,21 @@
 
 static const char *string_for_property_type( AcmPropertyType propertyType )
 {
-	const char *propToStr[ ACM_MAX_PROPERTY_TYPES ] = {
+	const char *propToStr[ ACM_PROPERTY_TYPE_MAX ] = {
 	        // Special types
 	        [ACM_PROPERTY_TYPE_OBJECT] = "object",
 	        [ACM_PROPERTY_TYPE_STRING] = "string",
 	        [ACM_PROPERTY_TYPE_BOOL]   = "bool",
 	        [ACM_PROPERTY_TYPE_ARRAY]  = "array",
 	        // Generic types
-	        [ND_PROPERTY_INT8]          = "int8",
-	        [ND_PROPERTY_INT16]         = "int16",
-	        [ND_PROPERTY_INT32]         = "int32",
-	        [ND_PROPERTY_INT64]         = "int64",
-	        [ND_PROPERTY_UI8]           = "uint8",
-	        [ND_PROPERTY_UI16]          = "uint16",
-	        [ND_PROPERTY_UI32]          = "uint32",
-	        [ND_PROPERTY_UI64]          = "uint64",
+	        [ACM_PROPERTY_TYPE_INT8]    = "int8",
+	        [ACM_PROPERTY_TYPE_INT16]   = "int16",
+	        [ACM_PROPERTY_TYPE_INT32]   = "int32",
+	        [ACM_PROPERTY_TYPE_INT64]   = "int64",
+	        [ACM_PROPERTY_TYPE_UI8]     = "uint8",
+	        [ACM_PROPERTY_TYPE_UI16]    = "uint16",
+	        [ACM_PROPERTY_TYPE_UI32]    = "uint32",
+	        [ACM_PROPERTY_TYPE_UI64]    = "uint64",
 	        [ACM_PROPERTY_TYPE_FLOAT16] = "float16",
 	        [ACM_PROPERTY_TYPE_FLOAT32] = "float",
 	        [ACM_PROPERTY_TYPE_FLOAT64] = "float64",
@@ -46,12 +45,16 @@ static const char *string_for_property_type( AcmPropertyType propertyType )
 	return propToStr[ propertyType ];
 }
 
+/////////////////////////////////////////////////////////////////////////////////////
+// Error Management
+/////////////////////////////////////////////////////////////////////////////////////
+
 static char         nlErrorMsg[ 4096 ];
-static AcmErrorCode nlErrorType = ND_ERROR_SUCCESS;
+static AcmErrorCode nlErrorType = ACM_ERROR_SUCCESS;
 static void         clear_error_message( void )
 {
 	*nlErrorMsg = '\0';
-	nlErrorType = ND_ERROR_SUCCESS;
+	nlErrorType = ACM_ERROR_SUCCESS;
 }
 
 static void set_error_message( AcmErrorCode type, const char *msg, ... )
@@ -71,21 +74,51 @@ static void set_error_message( AcmErrorCode type, const char *msg, ... )
 const char  *acm_get_error_message( void ) { return nlErrorMsg; }
 AcmErrorCode acm_get_error( void ) { return nlErrorType; }
 
-static AcmString *alloc_var_string( const char *string, AcmString *dst )
+/////////////////////////////////////////////////////////////////////////////////////
+// Memory
+/////////////////////////////////////////////////////////////////////////////////////
+
+void *( *acm_calloc )( size_t num, size_t size ) = calloc;
+void *( *acm_realloc )( void *p, size_t size )   = realloc;
+void ( *acm_free )( void *p )                    = free;
+
+void *acm_mem_alloc( const size_t size )
+{
+	void *p = acm_calloc( size, sizeof( char ) );
+	if ( p == NULL )
+	{
+		set_error_message( ACM_ERROR_MEM_ALLOC, "failed on alloc (%u)", size );
+		return NULL;
+	}
+
+	return p;
+}
+
+void *acm_mem_realloc( void *p, const size_t size )
+{
+	return acm_realloc( p, size );
+}
+
+void acm_mem_free( void *p )
+{
+	acm_free( p );
+}
+
+static AcmString *acm_mem_alloc_string( const char *string, AcmString *dst )
 {
 	dst->bufSize = ( uint16_t ) strlen( string ) + 1;
-
-	dst->buf = ACM_NEW_( char, dst->bufSize );
+	dst->buf     = acm_mem_alloc( dst->bufSize );
 	if ( dst->buf == NULL )
 	{
-		set_error_message( NL_ERROR_MEM_ALLOC, "failed to allocate memory for variable string" );
 		return NULL;
 	}
 
 	strcpy( dst->buf, string );
-
 	return dst;
 }
+
+/////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////
 
 unsigned int acm_get_num_of_children( const AcmBranch *self )
 {
@@ -102,14 +135,8 @@ AcmBranch *acm_get_next_child( AcmBranch *node )
 	return node->next;
 }
 
-AcmBranch *acm_get_child_by_name( AcmBranch *self, const char *name )
+static AcmBranch *get_child_by_name( AcmBranch *self, const char *name )
 {
-	if ( self->type != ACM_PROPERTY_TYPE_OBJECT )
-	{
-		set_error_message( ND_ERROR_INVALID_TYPE, "attempted to get child from an invalid node type!\n" );
-		return NULL;
-	}
-
 	AcmBranch *child = acm_get_first_child( self );
 	while ( child != NULL )
 	{
@@ -124,9 +151,61 @@ AcmBranch *acm_get_child_by_name( AcmBranch *self, const char *name )
 	return NULL;
 }
 
+AcmBranch *acm_get_child( AcmBranch *self, const char *path )
+{
+	if ( self->type != ACM_PROPERTY_TYPE_OBJECT )
+	{
+		set_error_message( ACM_ERROR_INVALID_TYPE, "attempted to get child from an invalid node type" );
+		return NULL;
+	}
+
+	size_t bufSize = 0;
+	char  *buf     = NULL;
+
+	// check if it's a path being passed in
+	// (in which case we navigate down the children)
+	const char *c;
+	while ( ( c = strchr( path, ACM_PATH_SEPERATOR ) ) != NULL )
+	{
+		const size_t size = c - path + 1;
+		if ( size >= bufSize )
+		{
+			char *nbuf = acm_mem_realloc( buf, size );
+			if ( nbuf == NULL )
+			{
+				self = NULL;
+				break;
+			}
+
+			buf     = nbuf;
+			bufSize = size;
+		}
+
+		memcpy( buf, path, size - 1 );
+		buf[ size - 1 ] = '\0';
+
+		self = get_child_by_name( self, buf );
+		if ( self == NULL )
+		{
+			break;
+		}
+
+		path = c + 1;
+	}
+
+	acm_mem_free( buf );
+
+	if ( self == NULL || path == NULL )
+	{
+		return NULL;
+	}
+
+	return get_child_by_name( self, path );
+}
+
 static const AcmString *get_value_by_name( AcmBranch *root, const char *name )
 {
-	const AcmBranch *field = acm_get_child_by_name( root, name );
+	const AcmBranch *field = acm_get_child( root, name );
 	if ( field == NULL )
 	{
 		return NULL;
@@ -163,114 +242,114 @@ AcmErrorCode acm_branch_get_string( const AcmBranch *self, char *dest, size_t le
 {
 	//TODO: why isn't this just returning the buf!?
 	//		if we can resolve this, it'll negate the need for get_value
-	if ( self->type != ACM_PROPERTY_TYPE_STRING ) return ND_ERROR_INVALID_TYPE;
+	if ( self->type != ACM_PROPERTY_TYPE_STRING ) return ACM_ERROR_INVALID_TYPE;
 	snprintf( dest, length, "%s", self->data.buf );
-	return ND_ERROR_SUCCESS;
+	return ACM_ERROR_SUCCESS;
 }
 
 AcmErrorCode acm_branch_get_bool( const AcmBranch *self, bool *dest )
 {
-	if ( self->type != ACM_PROPERTY_TYPE_BOOL ) return ND_ERROR_INVALID_TYPE;
+	if ( self->type != ACM_PROPERTY_TYPE_BOOL ) return ACM_ERROR_INVALID_TYPE;
 
 	if ( ( strcmp( self->data.buf, "true" ) == 0 ) || ( self->data.buf[ 0 ] == '1' && self->data.buf[ 1 ] == '\0' ) )
 	{
 		*dest = true;
-		return ND_ERROR_SUCCESS;
+		return ACM_ERROR_SUCCESS;
 	}
 	if ( ( strcmp( self->data.buf, "false" ) == 0 ) || ( self->data.buf[ 0 ] == '0' && self->data.buf[ 1 ] == '\0' ) )
 	{
 		*dest = false;
-		return ND_ERROR_SUCCESS;
+		return ACM_ERROR_SUCCESS;
 	}
 
-	set_error_message( ND_ERROR_INVALID_ARGUMENT, "invalid data passed from var" );
-	return ND_ERROR_INVALID_ARGUMENT;
+	set_error_message( ACM_ERROR_INVALID_ARGUMENT, "invalid data passed from var" );
+	return ACM_ERROR_INVALID_ARGUMENT;
 }
 
 #ifdef ACM_SUPPORT_FLT16
 AcmErrorCode acm_branch_get_float16( const AcmBranch *self, _Float16 *dest )
 {
-	if ( self->type != ACM_PROPERTY_TYPE_FLOAT16 ) return ND_ERROR_INVALID_TYPE;
+	if ( self->type != ACM_PROPERTY_TYPE_FLOAT16 ) return ACM_ERROR_INVALID_TYPE;
 	*dest = strtof( self->data.buf, NULL );
-	return ND_ERROR_SUCCESS;
+	return ACM_ERROR_SUCCESS;
 }
 #endif
 
 AcmErrorCode acm_branch_get_float32( const AcmBranch *self, float *dest )
 {
-	if ( self->type != ACM_PROPERTY_TYPE_FLOAT32 ) return ND_ERROR_INVALID_TYPE;
+	if ( self->type != ACM_PROPERTY_TYPE_FLOAT32 ) return ACM_ERROR_INVALID_TYPE;
 	*dest = strtof( self->data.buf, NULL );
-	return ND_ERROR_SUCCESS;
+	return ACM_ERROR_SUCCESS;
 }
 
 AcmErrorCode acm_branch_get_float64( const AcmBranch *self, double *dest )
 {
-	if ( self->type != ACM_PROPERTY_TYPE_FLOAT64 ) return ND_ERROR_INVALID_TYPE;
+	if ( self->type != ACM_PROPERTY_TYPE_FLOAT64 ) return ACM_ERROR_INVALID_TYPE;
 	*dest = strtod( self->data.buf, NULL );
-	return ND_ERROR_SUCCESS;
+	return ACM_ERROR_SUCCESS;
 }
 
 AcmErrorCode acm_branch_get_int8( const AcmBranch *self, int8_t *dest )
 {
-	if ( self->type != ND_PROPERTY_INT8 ) return ND_ERROR_INVALID_TYPE;
+	if ( self->type != ACM_PROPERTY_TYPE_INT8 ) return ACM_ERROR_INVALID_TYPE;
 	*dest = ( int8_t ) strtol( self->data.buf, NULL, 10 );
-	return ND_ERROR_SUCCESS;
+	return ACM_ERROR_SUCCESS;
 }
 
 AcmErrorCode acm_branch_get_int16( const AcmBranch *self, int16_t *dest )
 {
-	if ( self->type != ND_PROPERTY_INT16 ) return ND_ERROR_INVALID_TYPE;
+	if ( self->type != ACM_PROPERTY_TYPE_INT16 ) return ACM_ERROR_INVALID_TYPE;
 	*dest = ( int16_t ) strtol( self->data.buf, NULL, 10 );
-	return ND_ERROR_SUCCESS;
+	return ACM_ERROR_SUCCESS;
 }
 
 AcmErrorCode acm_branch_get_int32( const AcmBranch *self, int32_t *dest )
 {
-	if ( self->type != ND_PROPERTY_INT32 ) return ND_ERROR_INVALID_TYPE;
+	if ( self->type != ACM_PROPERTY_TYPE_INT32 ) return ACM_ERROR_INVALID_TYPE;
 	*dest = ( int32_t ) strtol( self->data.buf, NULL, 10 );
-	return ND_ERROR_SUCCESS;
+	return ACM_ERROR_SUCCESS;
 }
 
 AcmErrorCode acm_branch_get_int64( const AcmBranch *self, int64_t *dest )
 {
-	if ( self->type != ND_PROPERTY_INT64 ) return ND_ERROR_INVALID_TYPE;
+	if ( self->type != ACM_PROPERTY_TYPE_INT64 ) return ACM_ERROR_INVALID_TYPE;
 	*dest = strtoll( self->data.buf, NULL, 10 );
-	return ND_ERROR_SUCCESS;
+	return ACM_ERROR_SUCCESS;
 }
 
 AcmErrorCode acm_branch_get_uint8( const AcmBranch *self, uint8_t *dest )
 {
-	if ( self->type != ND_PROPERTY_UI8 ) return ND_ERROR_INVALID_TYPE;
+	if ( self->type != ACM_PROPERTY_TYPE_UI8 ) return ACM_ERROR_INVALID_TYPE;
 	*dest = ( uint8_t ) strtoul( self->data.buf, NULL, 10 );
-	return ND_ERROR_SUCCESS;
+	return ACM_ERROR_SUCCESS;
 }
 
 AcmErrorCode acm_branch_get_uint16( const AcmBranch *self, uint16_t *dest )
 {
-	if ( self->type != ND_PROPERTY_UI16 ) return ND_ERROR_INVALID_TYPE;
+	if ( self->type != ACM_PROPERTY_TYPE_UI16 ) return ACM_ERROR_INVALID_TYPE;
 	*dest = ( uint16_t ) strtoul( self->data.buf, NULL, 10 );
-	return ND_ERROR_SUCCESS;
+	return ACM_ERROR_SUCCESS;
 }
 
 AcmErrorCode acm_branch_get_uint32( const AcmBranch *self, uint32_t *dest )
 {
-	if ( self->type != ND_PROPERTY_UI32 ) return ND_ERROR_INVALID_TYPE;
+	if ( self->type != ACM_PROPERTY_TYPE_UI32 ) return ACM_ERROR_INVALID_TYPE;
 	*dest = strtoul( self->data.buf, NULL, 10 );
-	return ND_ERROR_SUCCESS;
+	return ACM_ERROR_SUCCESS;
 }
 
 AcmErrorCode acm_branch_get_uint64( const AcmBranch *self, uint64_t *dest )
 {
-	if ( self->type != ND_PROPERTY_UI64 ) return ND_ERROR_INVALID_TYPE;
+	if ( self->type != ACM_PROPERTY_TYPE_UI64 ) return ACM_ERROR_INVALID_TYPE;
 	*dest = strtoull( self->data.buf, NULL, 10 );
-	return ND_ERROR_SUCCESS;
+	return ACM_ERROR_SUCCESS;
 }
 
 AcmErrorCode acm_branch_get_string_array( AcmBranch *self, char **buf, unsigned int numElements )
 {
 	if ( self->type != ACM_PROPERTY_TYPE_ARRAY || self->childType != ACM_PROPERTY_TYPE_STRING )
 	{
-		return ND_ERROR_INVALID_TYPE;
+		return ACM_ERROR_INVALID_TYPE;
 	}
 
 	AcmBranch *child = acm_get_first_child( self );
@@ -278,136 +357,141 @@ AcmErrorCode acm_branch_get_string_array( AcmBranch *self, char **buf, unsigned 
 	{
 		if ( child == NULL )
 		{
-			return ND_ERROR_INVALID_ELEMENTS;
+			return ACM_ERROR_INVALID_ELEMENTS;
 		}
 
-		buf[ i ] = ACM_NEW_( char, strlen( child->data.buf ) + 1 );
+		buf[ i ] = acm_mem_alloc( strlen( child->data.buf ) + 1 );
+		if ( buf[ i ] == NULL )
+		{
+			return ACM_ERROR_MEM_ALLOC;
+		}
+
 		strcpy( buf[ i ], child->data.buf );
 
 		child = acm_get_next_child( child );
 	}
 
-	return ND_ERROR_SUCCESS;
+	return ACM_ERROR_SUCCESS;
 }
 
 AcmErrorCode acm_branch_get_bool_array( AcmBranch *self, bool *buf, unsigned int numElements )
 {
 	if ( self->type != ACM_PROPERTY_TYPE_ARRAY || self->childType != ACM_PROPERTY_TYPE_FLOAT64 )
-		return ND_ERROR_INVALID_TYPE;
+		return ACM_ERROR_INVALID_TYPE;
 
 	AcmBranch *child = acm_get_first_child( self );
 	for ( unsigned int i = 0; i < numElements; ++i )
 	{
 		if ( child == NULL )
-			return ND_ERROR_INVALID_ELEMENTS;
+			return ACM_ERROR_INVALID_ELEMENTS;
 
 		AcmErrorCode errorCode = acm_branch_get_bool( child, &buf[ i ] );
-		if ( errorCode != ND_ERROR_SUCCESS )
+		if ( errorCode != ACM_ERROR_SUCCESS )
 			return errorCode;
 
 		child = acm_get_next_child( child );
 	}
 
-	return ND_ERROR_SUCCESS;
+	return ACM_ERROR_SUCCESS;
 }
 
 AcmErrorCode acm_branch_get_int8_array( AcmBranch *self, int8_t *buf, unsigned int numElements )
 {
-	if ( self->type != ACM_PROPERTY_TYPE_ARRAY || self->childType != ND_PROPERTY_INT8 )
-		return ND_ERROR_INVALID_TYPE;
+	if ( self->type != ACM_PROPERTY_TYPE_ARRAY || self->childType != ACM_PROPERTY_TYPE_INT8 )
+		return ACM_ERROR_INVALID_TYPE;
 
 	AcmBranch *child = acm_get_first_child( self );
 	for ( unsigned int i = 0; i < numElements; ++i )
 	{
 		if ( child == NULL )
-			return ND_ERROR_INVALID_ELEMENTS;
+			return ACM_ERROR_INVALID_ELEMENTS;
 
 		AcmErrorCode errorCode = acm_branch_get_int8( child, &buf[ i ] );
-		if ( errorCode != ND_ERROR_SUCCESS )
+		if ( errorCode != ACM_ERROR_SUCCESS )
 			return errorCode;
 
 		child = acm_get_next_child( child );
 	}
 
-	return ND_ERROR_SUCCESS;
+	return ACM_ERROR_SUCCESS;
 }
 
 AcmErrorCode acm_branch_get_int16_array( AcmBranch *self, int16_t *buf, unsigned int numElements )
 {
-	if ( self->type != ACM_PROPERTY_TYPE_ARRAY || self->childType != ND_PROPERTY_INT16 )
-		return ND_ERROR_INVALID_TYPE;
+	if ( self->type != ACM_PROPERTY_TYPE_ARRAY || self->childType != ACM_PROPERTY_TYPE_INT16 )
+		return ACM_ERROR_INVALID_TYPE;
 
 	AcmBranch *child = acm_get_first_child( self );
 	for ( unsigned int i = 0; i < numElements; ++i )
 	{
 		if ( child == NULL )
-			return ND_ERROR_INVALID_ELEMENTS;
+			return ACM_ERROR_INVALID_ELEMENTS;
 
 		AcmErrorCode errorCode = acm_branch_get_int16( child, &buf[ i ] );
-		if ( errorCode != ND_ERROR_SUCCESS )
+		if ( errorCode != ACM_ERROR_SUCCESS )
 			return errorCode;
 
 		child = acm_get_next_child( child );
 	}
 
-	return ND_ERROR_SUCCESS;
+	return ACM_ERROR_SUCCESS;
 }
 
 AcmErrorCode acm_branch_get_int32_array( AcmBranch *self, int32_t *buf, unsigned int numElements )
 {
-	if ( self->type != ACM_PROPERTY_TYPE_ARRAY || self->childType != ND_PROPERTY_INT32 )
-		return ND_ERROR_INVALID_TYPE;
+	if ( self->type != ACM_PROPERTY_TYPE_ARRAY || self->childType != ACM_PROPERTY_TYPE_INT32 )
+		return ACM_ERROR_INVALID_TYPE;
 
 	AcmBranch *child = acm_get_first_child( self );
 	for ( unsigned int i = 0; i < numElements; ++i )
 	{
 		if ( child == NULL )
-			return ND_ERROR_INVALID_ELEMENTS;
+			return ACM_ERROR_INVALID_ELEMENTS;
 
 		AcmErrorCode errorCode = acm_branch_get_int32( child, &buf[ i ] );
-		if ( errorCode != ND_ERROR_SUCCESS )
+		if ( errorCode != ACM_ERROR_SUCCESS )
 			return errorCode;
 
 		child = acm_get_next_child( child );
 	}
 
-	return ND_ERROR_SUCCESS;
+	return ACM_ERROR_SUCCESS;
 }
 
 AcmErrorCode acm_branch_get_uint32_array( AcmBranch *self, uint32_t *buf, unsigned int numElements )
 {
-	if ( self->type != ACM_PROPERTY_TYPE_ARRAY || self->childType != ND_PROPERTY_UI32 )
-		return ND_ERROR_INVALID_TYPE;
+	if ( self->type != ACM_PROPERTY_TYPE_ARRAY || self->childType != ACM_PROPERTY_TYPE_UI32 )
+		return ACM_ERROR_INVALID_TYPE;
 
 	AcmBranch *child = acm_get_first_child( self );
 	for ( unsigned int i = 0; i < numElements; ++i )
 	{
 		if ( child == NULL )
-			return ND_ERROR_INVALID_ELEMENTS;
+			return ACM_ERROR_INVALID_ELEMENTS;
 
 		AcmErrorCode errorCode = acm_branch_get_uint32( child, &buf[ i ] );
-		if ( errorCode != ND_ERROR_SUCCESS )
+		if ( errorCode != ACM_ERROR_SUCCESS )
 			return errorCode;
 
 		child = acm_get_next_child( child );
 	}
 
-	return ND_ERROR_SUCCESS;
+	return ACM_ERROR_SUCCESS;
 }
 
 AcmErrorCode acm_branch_get_float32_array( AcmBranch *self, float *buf, unsigned int numElements )
 {
 	if ( self->type != ACM_PROPERTY_TYPE_ARRAY || self->childType != ACM_PROPERTY_TYPE_FLOAT32 )
-		return ND_ERROR_INVALID_TYPE;
+		return ACM_ERROR_INVALID_TYPE;
 
 	AcmBranch *child = acm_get_first_child( self );
 	for ( unsigned int i = 0; i < numElements; ++i )
 	{
 		if ( child == NULL )
-			return ND_ERROR_INVALID_ELEMENTS;
+			return ACM_ERROR_INVALID_ELEMENTS;
 
 		AcmErrorCode errorCode = acm_branch_get_float32( child, &buf[ i ] );
-		if ( errorCode != ND_ERROR_SUCCESS )
+		if ( errorCode != ACM_ERROR_SUCCESS )
 		{
 			return errorCode;
 		}
@@ -415,14 +499,14 @@ AcmErrorCode acm_branch_get_float32_array( AcmBranch *self, float *buf, unsigned
 		child = acm_get_next_child( child );
 	}
 
-	return ND_ERROR_SUCCESS;
+	return ACM_ERROR_SUCCESS;
 }
 
 AcmErrorCode acm_branch_get_float64_array( AcmBranch *self, double *buf, unsigned int numElements )
 {
 	if ( self->type != ACM_PROPERTY_TYPE_ARRAY || self->childType != ACM_PROPERTY_TYPE_FLOAT64 )
 	{
-		return ND_ERROR_INVALID_TYPE;
+		return ACM_ERROR_INVALID_TYPE;
 	}
 
 	AcmBranch *child = acm_get_first_child( self );
@@ -430,17 +514,17 @@ AcmErrorCode acm_branch_get_float64_array( AcmBranch *self, double *buf, unsigne
 	{
 		if ( child == NULL )
 		{
-			return ND_ERROR_INVALID_ELEMENTS;
+			return ACM_ERROR_INVALID_ELEMENTS;
 		}
 
 		AcmErrorCode errorCode = acm_branch_get_float64( child, &buf[ i ] );
-		if ( errorCode != ND_ERROR_SUCCESS )
+		if ( errorCode != ACM_ERROR_SUCCESS )
 			return errorCode;
 
 		child = acm_get_next_child( child );
 	}
 
-	return ND_ERROR_SUCCESS;
+	return ACM_ERROR_SUCCESS;
 }
 
 /******************************************/
@@ -448,14 +532,14 @@ AcmErrorCode acm_branch_get_float64_array( AcmBranch *self, double *buf, unsigne
 
 bool acm_get_bool( AcmBranch *root, const char *name, bool fallback )
 {
-	const AcmBranch *child = acm_get_child_by_name( root, name );
+	const AcmBranch *child = acm_get_child( root, name );
 	if ( child == NULL )
 	{
 		return fallback;
 	}
 
 	bool out;
-	if ( acm_branch_get_bool( child, &out ) != ND_ERROR_SUCCESS )
+	if ( acm_branch_get_bool( child, &out ) != ACM_ERROR_SUCCESS )
 	{
 		return fallback;
 	}
@@ -477,13 +561,13 @@ float acm_get_f32( AcmBranch *node, const char *name, float fallback )
 
 float *acm_get_array_f32( AcmBranch *branch, const char *name, float *destination, uint32_t numElements )
 {
-	AcmBranch *child = acm_get_child_by_name( branch, name );
+	AcmBranch *child = acm_get_child( branch, name );
 	if ( child == NULL )
 	{
 		return NULL;
 	}
 
-	if ( acm_branch_get_float32_array( child, destination, numElements ) != ND_ERROR_SUCCESS )
+	if ( acm_branch_get_float32_array( child, destination, numElements ) != ACM_ERROR_SUCCESS )
 	{
 		return NULL;
 	}
@@ -512,13 +596,13 @@ uintmax_t acm_get_uint( AcmBranch *root, const char *name, uintmax_t fallback )
 
 int16_t *acm_get_array_i16( AcmBranch *branch, const char *name, int16_t *destination, unsigned int numElements )
 {
-	AcmBranch *child = acm_get_child_by_name( branch, name );
+	AcmBranch *child = acm_get_child( branch, name );
 	if ( child == NULL )
 	{
 		return NULL;
 	}
 
-	if ( acm_branch_get_int16_array( child, destination, numElements ) != ND_ERROR_SUCCESS )
+	if ( acm_branch_get_int16_array( child, destination, numElements ) != ACM_ERROR_SUCCESS )
 	{
 		return NULL;
 	}
@@ -590,16 +674,24 @@ AcmBranch *acm_push_new_branch( AcmBranch *parent, const char *name, AcmProperty
 	/* arrays are special cases */
 	if ( parent != NULL && parent->type == ACM_PROPERTY_TYPE_ARRAY && propertyType != parent->childType )
 	{
-		set_error_message( ND_ERROR_INVALID_TYPE, "attempted to add invalid type (%s)", string_for_property_type( propertyType ) );
+		set_error_message( ACM_ERROR_INVALID_TYPE, "attempted to add invalid type (%s)", string_for_property_type( propertyType ) );
 		return NULL;
 	}
 
-	AcmBranch *node = ACM_NEW( AcmBranch );
+	AcmBranch *node = acm_mem_alloc( sizeof( AcmBranch ) );
+	if ( node == NULL )
+	{
+		return NULL;
+	}
 
 	/* assign the node name, if provided */
 	if ( ( parent == NULL || parent->type != ACM_PROPERTY_TYPE_ARRAY ) && name != NULL )
 	{
-		alloc_var_string( name, &node->name );
+		if ( acm_mem_alloc_string( name, &node->name ) == NULL )
+		{
+			acm_mem_free( node );
+			return NULL;
+		}
 	}
 
 	node->type      = propertyType;
@@ -622,7 +714,7 @@ AcmBranch *acm_push_variable_( AcmBranch *parent, const char *name, const char *
 		return NULL;
 	}
 
-	alloc_var_string( value, &branch->data );
+	acm_mem_alloc_string( value, &branch->data );
 	return branch;
 }
 
@@ -670,42 +762,42 @@ AcmBranch *acm_push_i8( AcmBranch *parent, const char *name, int8_t var )
 {
 	char buf[ 8 ];
 	snprintf( buf, sizeof( buf ), "%" PRId8, var );
-	return acm_push_variable_( parent, name, buf, ND_PROPERTY_INT8 );
+	return acm_push_variable_( parent, name, buf, ACM_PROPERTY_TYPE_INT8 );
 }
 
 AcmBranch *acm_push_ui8( AcmBranch *parent, const char *name, uint8_t var )
 {
 	char buf[ 8 ];
 	snprintf( buf, sizeof( buf ), "%" PRIu8, var );
-	return acm_push_variable_( parent, name, buf, ND_PROPERTY_UI8 );
+	return acm_push_variable_( parent, name, buf, ACM_PROPERTY_TYPE_UI8 );
 }
 
 AcmBranch *acm_push_i16( AcmBranch *parent, const char *name, int16_t var )
 {
 	char buf[ 32 ];
 	snprintf( buf, sizeof( buf ), "%" PRId16, var );
-	return acm_push_variable_( parent, name, buf, ND_PROPERTY_INT16 );
+	return acm_push_variable_( parent, name, buf, ACM_PROPERTY_TYPE_INT16 );
 }
 
 AcmBranch *acm_push_ui16( AcmBranch *parent, const char *name, uint16_t var )
 {
 	char buf[ 32 ];
 	snprintf( buf, sizeof( buf ), "%" PRIu16, var );
-	return acm_push_variable_( parent, name, buf, ND_PROPERTY_UI16 );
+	return acm_push_variable_( parent, name, buf, ACM_PROPERTY_TYPE_UI16 );
 }
 
 AcmBranch *acm_push_i32( AcmBranch *parent, const char *name, int32_t var )
 {
 	char buf[ 32 ];
 	snprintf( buf, sizeof( buf ), "%" PRId32, var );
-	return acm_push_variable_( parent, name, buf, ND_PROPERTY_INT32 );
+	return acm_push_variable_( parent, name, buf, ACM_PROPERTY_TYPE_INT32 );
 }
 
 AcmBranch *acm_push_ui32( AcmBranch *parent, const char *name, uint32_t var )
 {
 	char buf[ 32 ];
 	snprintf( buf, sizeof( buf ), "%" PRIu32, var );
-	return acm_push_variable_( parent, name, buf, ND_PROPERTY_UI32 );
+	return acm_push_variable_( parent, name, buf, ACM_PROPERTY_TYPE_UI32 );
 }
 
 #ifdef ACM_SUPPORT_FLT16
@@ -733,7 +825,7 @@ AcmBranch *acm_push_f64( AcmBranch *parent, const char *name, double var )
 
 AcmBranch *acm_push_array_i16( AcmBranch *root, const char *name, const int16_t *array, unsigned int numElements )
 {
-	AcmBranch *node = acm_push_new_branch( root, name, ACM_PROPERTY_TYPE_ARRAY, ND_PROPERTY_INT16 );
+	AcmBranch *node = acm_push_new_branch( root, name, ACM_PROPERTY_TYPE_ARRAY, ACM_PROPERTY_TYPE_INT16 );
 	if ( node != NULL )
 	{
 		for ( unsigned int i = 0; i < numElements; ++i )
@@ -746,7 +838,7 @@ AcmBranch *acm_push_array_i16( AcmBranch *root, const char *name, const int16_t 
 
 AcmBranch *acm_push_array_i32( AcmBranch *parent, const char *name, const int32_t *array, unsigned int numElements )
 {
-	AcmBranch *node = acm_push_new_branch( parent, name, ACM_PROPERTY_TYPE_ARRAY, ND_PROPERTY_INT32 );
+	AcmBranch *node = acm_push_new_branch( parent, name, ACM_PROPERTY_TYPE_ARRAY, ACM_PROPERTY_TYPE_INT32 );
 	if ( node != NULL )
 	{
 		for ( unsigned int i = 0; i < numElements; ++i )
@@ -759,7 +851,7 @@ AcmBranch *acm_push_array_i32( AcmBranch *parent, const char *name, const int32_
 
 AcmBranch *acm_push_array_ui32( AcmBranch *parent, const char *name, const uint32_t *array, unsigned int numElements )
 {
-	AcmBranch *node = acm_push_new_branch( parent, name, ACM_PROPERTY_TYPE_ARRAY, ND_PROPERTY_UI32 );
+	AcmBranch *node = acm_push_new_branch( parent, name, ACM_PROPERTY_TYPE_ARRAY, ACM_PROPERTY_TYPE_UI32 );
 	if ( node != NULL )
 	{
 		for ( unsigned int i = 0; i < numElements; ++i )
@@ -800,7 +892,7 @@ AcmBranch *acm_push_array_f32( AcmBranch *parent, const char *name, const float 
 
 bool acm_set_variable( AcmBranch *root, const char *name, const char *value, AcmPropertyType type, bool createOnFail )
 {
-	AcmBranch *child = acm_get_child_by_name( root, name );
+	AcmBranch *child = acm_get_child( root, name );
 	if ( child == NULL )
 	{
 		if ( !createOnFail )
@@ -813,17 +905,17 @@ bool acm_set_variable( AcmBranch *root, const char *name, const char *value, Acm
 
 	if ( child->type != type )
 	{
-		set_error_message( ND_ERROR_INVALID_TYPE, "attempted to set variable (%s) to invalid type (%s)", name, string_for_property_type( type ) );
+		set_error_message( ACM_ERROR_INVALID_TYPE, "attempted to set variable (%s) to invalid type (%s)", name, string_for_property_type( type ) );
 		return false;
 	}
 
 	size_t length = strlen( value ) + 1;
 	if ( length > child->data.bufSize )
 	{
-		void *p = ACM_REALLOC( child->data.buf, char, length );
+		void *p = acm_mem_realloc( child->data.buf, sizeof( char ) * length );
 		if ( p == NULL )
 		{
-			set_error_message( NL_ERROR_MEM_ALLOC, "failed to allocate memory for variable (%s)", name );
+			set_error_message( ACM_ERROR_MEM_ALLOC, "failed to allocate memory for variable (%s)", name );
 			return false;
 		}
 
@@ -845,10 +937,9 @@ static AcmString *copy_var_string( const AcmString *src, AcmString *dst )
 {
 	dst->bufSize = src->bufSize;
 
-	dst->buf = ACM_NEW_( char, src->bufSize );
+	dst->buf = acm_mem_alloc( src->bufSize );
 	if ( dst->buf == NULL )
 	{
-		set_error_message( NL_ERROR_MEM_ALLOC, "failed to allocate memory for variable string" );
 		return NULL;
 	}
 
@@ -862,7 +953,7 @@ static AcmString *copy_var_string( const AcmString *src, AcmString *dst )
  */
 AcmBranch *acm_copy_branch( AcmBranch *node )
 {
-	AcmBranch *newNode = ACM_NEW( AcmBranch );
+	AcmBranch *newNode = acm_mem_alloc( sizeof( AcmBranch ) );
 	newNode->type      = node->type;
 	newNode->childType = node->childType;
 	copy_var_string( &node->data, &newNode->data );
@@ -887,8 +978,8 @@ void acm_branch_destroy( AcmBranch *node )
 		return;
 	}
 
-	ACM_DELETE( node->name.buf );
-	ACM_DELETE( node->data.buf );
+	acm_mem_free( node->name.buf );
+	acm_mem_free( node->data.buf );
 
 	/* if it's an object/array, we'll need to clean up all it's children */
 	if ( node->type == ACM_PROPERTY_TYPE_OBJECT || node->type == ACM_PROPERTY_TYPE_ARRAY )
@@ -925,7 +1016,7 @@ void acm_branch_destroy( AcmBranch *node )
 		node->parent->numChildren--;
 	}
 
-	ACM_DELETE( node );
+	acm_mem_free( node );
 }
 
 /******************************************/
@@ -952,7 +1043,12 @@ static char *read_string( const void **buf, size_t *bufSize, uint16_t size )
 		return NULL;
 	}
 
-	char *string = ACM_NEW_( char, size + 1 );
+	char *string = acm_mem_alloc( size + 1 );
+	if ( string == NULL )
+	{
+		return NULL;
+	}
+
 	strcpy( string, src );
 	return string;
 }
@@ -985,21 +1081,21 @@ static AcmBranch *deserialize_binary_node( const void **buf, size_t *bufSize, Ac
 	if ( type == NULL )
 	{
 		Warning( "Failed to read property type for node (%s)!\n", name.buf ? name.buf : "unnamed" );
-		ACM_DELETE( name.buf );
+		acm_mem_free( name.buf );
 		return NULL;
 	}
 
-	if ( *type == ACM_PROPERTY_TYPE_INVALID || *type >= ACM_MAX_PROPERTY_TYPES )
+	if ( *type == ACM_PROPERTY_TYPE_INVALID || *type >= ACM_PROPERTY_TYPE_MAX )
 	{
 		Warning( "Invalid property type (%u) for node (%s)!\n", *type, name.buf ? name.buf : "unnamed" );
-		ACM_DELETE( name.buf );
+		acm_mem_free( name.buf );
 		return NULL;
 	}
 
 	AcmBranch *node = acm_push_new_branch( parent, NULL, *type, ACM_PROPERTY_TYPE_INVALID );
 	if ( node == NULL )
 	{
-		ACM_DELETE( name.buf );
+		acm_mem_free( name.buf );
 		return NULL;
 	}
 
@@ -1016,7 +1112,7 @@ static AcmBranch *deserialize_binary_node( const void **buf, size_t *bufSize, Ac
 			return NULL;
 		}
 
-		if ( *childType == ACM_PROPERTY_TYPE_INVALID || *childType >= ACM_MAX_PROPERTY_TYPES )
+		if ( *childType == ACM_PROPERTY_TYPE_INVALID || *childType >= ACM_PROPERTY_TYPE_MAX )
 		{
 			Warning( "Invalid child property type (%u) for node (%s)!\n", *childType, name.buf ? name.buf : "unnamed" );
 			acm_branch_destroy( node );
@@ -1040,24 +1136,24 @@ static AcmBranch *deserialize_binary_node( const void **buf, size_t *bufSize, Ac
 			typeSize = sizeof( double );
 			break;
 		case ACM_PROPERTY_TYPE_BOOL:
-		case ND_PROPERTY_INT8:
-		case ND_PROPERTY_UI8:
+		case ACM_PROPERTY_TYPE_INT8:
+		case ACM_PROPERTY_TYPE_UI8:
 			typeSize = sizeof( uint8_t );
 			break;
 		case ACM_PROPERTY_TYPE_FLOAT16:
 		case ACM_PROPERTY_TYPE_STRING:
-		case ND_PROPERTY_INT16:
-		case ND_PROPERTY_UI16:
+		case ACM_PROPERTY_TYPE_INT16:
+		case ACM_PROPERTY_TYPE_UI16:
 			typeSize = sizeof( uint16_t );
 			break;
 		case ACM_PROPERTY_TYPE_ARRAY:
 		case ACM_PROPERTY_TYPE_OBJECT:
-		case ND_PROPERTY_INT32:
-		case ND_PROPERTY_UI32:
+		case ACM_PROPERTY_TYPE_INT32:
+		case ACM_PROPERTY_TYPE_UI32:
 			typeSize = sizeof( uint32_t );
 			break;
-		case ND_PROPERTY_INT64:
-		case ND_PROPERTY_UI64:
+		case ACM_PROPERTY_TYPE_INT64:
+		case ACM_PROPERTY_TYPE_UI64:
 			typeSize = sizeof( uint64_t );
 			break;
 	}
@@ -1104,7 +1200,7 @@ static AcmBranch *deserialize_binary_node( const void **buf, size_t *bufSize, Ac
 		}
 		case ACM_PROPERTY_TYPE_BOOL:
 		{
-			alloc_var_string( *( ( bool * ) data ) ? "true" : "false", &node->data );
+			acm_mem_alloc_string( *( ( bool * ) data ) ? "true" : "false", &node->data );
 			break;
 		}
 #ifdef ACM_SUPPORT_FLT16
@@ -1112,7 +1208,7 @@ static AcmBranch *deserialize_binary_node( const void **buf, size_t *bufSize, Ac
 		{
 			char str[ 32 ];
 			snprintf( str, sizeof( str ), "%f", ( double ) *( _Float16 * ) data );
-			alloc_var_string( str, &node->data );
+			acm_mem_alloc_string( str, &node->data );
 			break;
 		}
 #endif
@@ -1120,35 +1216,35 @@ static AcmBranch *deserialize_binary_node( const void **buf, size_t *bufSize, Ac
 		{
 			char str[ 32 ];
 			snprintf( str, sizeof( str ), "%f", *( float * ) data );
-			alloc_var_string( str, &node->data );
+			acm_mem_alloc_string( str, &node->data );
 			break;
 		}
 		case ACM_PROPERTY_TYPE_FLOAT64:
 		{
 			char str[ 32 ];
 			snprintf( str, sizeof( str ), "%lf", *( double * ) data );
-			alloc_var_string( str, &node->data );
+			acm_mem_alloc_string( str, &node->data );
 			break;
 		}
-		case ND_PROPERTY_UI8:
+		case ACM_PROPERTY_TYPE_UI8:
 		{
 			char str[ 32 ];
 			snprintf( str, sizeof( str ), "%" PRIu8, *( uint8_t * ) data );
-			alloc_var_string( str, &node->data );
+			acm_mem_alloc_string( str, &node->data );
 			break;
 		}
-		case ND_PROPERTY_INT8:
+		case ACM_PROPERTY_TYPE_INT8:
 		{
 			char str[ 32 ];
 			snprintf( str, sizeof( str ), "%" PRId8, *( int8_t * ) data );
-			alloc_var_string( str, &node->data );
+			acm_mem_alloc_string( str, &node->data );
 			break;
 		}
-		case ND_PROPERTY_UI16:
+		case ACM_PROPERTY_TYPE_UI16:
 		{
 			char str[ 32 ];
 			snprintf( str, sizeof( str ), "%" PRIu16, *( uint16_t * ) data );
-			alloc_var_string( str, &node->data );
+			acm_mem_alloc_string( str, &node->data );
 			// slapped on fix for a bug with serialisation in older versions
 			if ( version < 2 )
 			{
@@ -1156,11 +1252,11 @@ static AcmBranch *deserialize_binary_node( const void **buf, size_t *bufSize, Ac
 			}
 			break;
 		}
-		case ND_PROPERTY_INT16:
+		case ACM_PROPERTY_TYPE_INT16:
 		{
 			char str[ 32 ];
 			snprintf( str, sizeof( str ), "%" PRId16, *( int16_t * ) data );
-			alloc_var_string( str, &node->data );
+			acm_mem_alloc_string( str, &node->data );
 			// slapped on fix for a bug with serialisation in older versions
 			if ( version < 2 )
 			{
@@ -1168,32 +1264,32 @@ static AcmBranch *deserialize_binary_node( const void **buf, size_t *bufSize, Ac
 			}
 			break;
 		}
-		case ND_PROPERTY_UI32:
+		case ACM_PROPERTY_TYPE_UI32:
 		{
 			char str[ 32 ];
 			snprintf( str, sizeof( str ), "%" PRIu32, *( uint32_t * ) data );
-			alloc_var_string( str, &node->data );
+			acm_mem_alloc_string( str, &node->data );
 			break;
 		}
-		case ND_PROPERTY_INT32:
+		case ACM_PROPERTY_TYPE_INT32:
 		{
 			char str[ 32 ];
 			snprintf( str, sizeof( str ), "%" PRId32, *( int32_t * ) data );
-			alloc_var_string( str, &node->data );
+			acm_mem_alloc_string( str, &node->data );
 			break;
 		}
-		case ND_PROPERTY_UI64:
+		case ACM_PROPERTY_TYPE_UI64:
 		{
 			char str[ 32 ];
 			snprintf( str, sizeof( str ), "%" PRIu64, *( uint64_t * ) data );
-			alloc_var_string( str, &node->data );
+			acm_mem_alloc_string( str, &node->data );
 			break;
 		}
-		case ND_PROPERTY_INT64:
+		case ACM_PROPERTY_TYPE_INT64:
 		{
 			char str[ 32 ];
 			snprintf( str, sizeof( str ), "%" PRId64, *( int64_t * ) data );
-			alloc_var_string( str, &node->data );
+			acm_mem_alloc_string( str, &node->data );
 			break;
 		}
 	}
@@ -1216,7 +1312,7 @@ static AcmFileType parse_node_file_type( const void *buf, uint32_t *version, uns
 		*version = *( uint32_t * ) ( buf + *headerSize );// inc + 1, because there's a new line after identifier
 		if ( *version == 0 || *version > ACM_FORMAT_BINARY_VERSION )
 		{
-			set_error_message( ND_ERROR_IO_READ, "invalid binary node format (%u == 0 || %u > %u)", *version, *version, ACM_FORMAT_BINARY_VERSION );
+			set_error_message( ACM_ERROR_IO_READ, "invalid binary node format (%u == 0 || %u > %u)", *version, *version, ACM_FORMAT_BINARY_VERSION );
 			return ACM_FILE_TYPE_INVALID;
 		}
 
@@ -1231,7 +1327,7 @@ static AcmFileType parse_node_file_type( const void *buf, uint32_t *version, uns
 		return ACM_FILE_TYPE_BINARY;
 	}
 
-	set_error_message( ND_ERROR_IO_READ, "unknown file type" );
+	set_error_message( ACM_ERROR_IO_READ, "unknown file type" );
 	return ACM_FILE_TYPE_INVALID;
 }
 
@@ -1281,7 +1377,7 @@ AcmBranch *acm_load_file( const char *path, const char *objectType )
 	if ( file == NULL )
 	{
 		snprintf( nlErrorMsg, sizeof( nlErrorMsg ), "failed to open file (%s)", path );
-		nlErrorType = ND_ERROR_IO_READ;
+		nlErrorType = ACM_ERROR_IO_READ;
 		return NULL;
 	}
 
@@ -1293,7 +1389,7 @@ AcmBranch *acm_load_file( const char *path, const char *objectType )
 	AcmBranch *root = NULL;
 
 	// now read it into memory
-	uint8_t *buf = ACM_NEW_( uint8_t, size + 1 );
+	uint8_t *buf = acm_mem_alloc( size + 1 );
 	if ( buf != NULL )
 	{
 		fread( buf, sizeof( uint8_t ), size, file );
@@ -1301,7 +1397,7 @@ AcmBranch *acm_load_file( const char *path, const char *objectType )
 		// finally hand it over to our parser
 		root = acm_load_from_memory( buf, size, objectType, path );
 
-		ACM_DELETE( buf );
+		acm_mem_free( buf );
 	}
 
 	fclose( file );
@@ -1455,56 +1551,56 @@ static void serialize_node( FILE *file, AcmBranch *node, AcmFileType fileType )
 			fwrite( &v, sizeof( double ), 1, file );
 			break;
 		}
-		case ND_PROPERTY_INT8:
+		case ACM_PROPERTY_TYPE_INT8:
 		{
 			int8_t v;
 			acm_branch_get_int8( node, &v );
 			fwrite( &v, sizeof( int8_t ), 1, file );
 			break;
 		}
-		case ND_PROPERTY_INT16:
+		case ACM_PROPERTY_TYPE_INT16:
 		{
 			int16_t v;
 			acm_branch_get_int16( node, &v );
 			fwrite( &v, sizeof( int16_t ), 1, file );
 			break;
 		}
-		case ND_PROPERTY_INT32:
+		case ACM_PROPERTY_TYPE_INT32:
 		{
 			int32_t v;
 			acm_branch_get_int32( node, &v );
 			fwrite( &v, sizeof( int32_t ), 1, file );
 			break;
 		}
-		case ND_PROPERTY_INT64:
+		case ACM_PROPERTY_TYPE_INT64:
 		{
 			int64_t v;
 			acm_branch_get_int64( node, &v );
 			fwrite( &v, sizeof( int64_t ), 1, file );
 			break;
 		}
-		case ND_PROPERTY_UI8:
+		case ACM_PROPERTY_TYPE_UI8:
 		{
 			uint8_t v;
 			acm_branch_get_uint8( node, &v );
 			fwrite( &v, sizeof( uint8_t ), 1, file );
 			break;
 		}
-		case ND_PROPERTY_UI16:
+		case ACM_PROPERTY_TYPE_UI16:
 		{
 			uint16_t v;
 			acm_branch_get_uint16( node, &v );
 			fwrite( &v, sizeof( uint16_t ), 1, file );
 			break;
 		}
-		case ND_PROPERTY_UI32:
+		case ACM_PROPERTY_TYPE_UI32:
 		{
 			uint32_t v;
 			acm_branch_get_uint32( node, &v );
 			fwrite( &v, sizeof( uint32_t ), 1, file );
 			break;
 		}
-		case ND_PROPERTY_UI64:
+		case ACM_PROPERTY_TYPE_UI64:
 		{
 			uint64_t v;
 			acm_branch_get_uint64( node, &v );
@@ -1555,7 +1651,7 @@ bool acm_write_file( const char *path, AcmBranch *root, AcmFileType fileType )
 	FILE *file = fopen( path, "wb" );
 	if ( file == NULL )
 	{
-		set_error_message( ND_ERROR_IO_WRITE, "failed to open path \"%s\"", path );
+		set_error_message( ACM_ERROR_IO_WRITE, "failed to open path \"%s\"", path );
 		return false;
 	}
 
@@ -1680,6 +1776,31 @@ TEST_ASSERT( root != NULL );
 acm_branch_destroy( root );
 TEST_FUNC_END()
 
+TEST_FUNC( paths )
+static const char *buf = R"(
+object material
+{
+	object test
+	{
+		float var 0
+		object subThing
+		{
+			float anotherVar 1.0
+		}
+	}
+})";
+
+AcmBranch *root = acm_parse_buffer( buf, NULL );
+TEST_ASSERT( root != NULL );
+
+const AcmBranch *child = acm_get_child( root, "test/subThing/anotherVar" );
+TEST_ASSERT( child != NULL );
+TEST_ASSERT( acm_branch_get_type( child ) == ACM_PROPERTY_TYPE_FLOAT32 );
+
+acm_branch_destroy( root );
+
+TEST_FUNC_END()
+
 int main( int argc, char **argv )
 {
 	argc;
@@ -1689,6 +1810,7 @@ int main( int argc, char **argv )
 
 	CALL_FUNC_TEST( parse_spaces )
 	CALL_FUNC_TEST( parse_tabs )
+	CALL_FUNC_TEST( paths )
 
 	TEST_RUN_END
 }

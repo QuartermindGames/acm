@@ -19,20 +19,14 @@ extern "C"
 {
 #endif
 
+	/////////////////////////////////////////////////////////////////////////////////////
 	// override these if you want to provide your own alloc methods
 	// just mind that ACM expects memory to be zero'd!!
-#ifndef ACM_NEW_
-#	define ACM_NEW_( TYPE, NUM ) ( TYPE * ) calloc( NUM, sizeof( TYPE ) )
-#endif
-#ifndef ACM_NEW
-#	define ACM_NEW( TYPE ) ACM_NEW_( TYPE, 1 )
-#endif
-#ifndef ACM_REALLOC
-#	define ACM_REALLOC( PTR, TYPE, NUM ) ( TYPE * ) realloc( PTR, ( NUM ) * sizeof( TYPE ) )
-#endif
-#ifndef ACM_DELETE
-#	define ACM_DELETE( PTR ) free( PTR )
-#endif
+	extern void *( *acm_calloc )( size_t num, size_t size );
+	extern void *( *acm_realloc )( void *p, size_t size );
+	extern void ( *acm_free )( void *p );
+
+	/////////////////////////////////////////////////////////////////////////////////////
 
 	typedef struct AcmBranch AcmBranch;
 
@@ -43,18 +37,20 @@ extern "C"
 #define ACM_DEFAULT_EXTENSION_OLD ".n"//TODO: should eventually remove this once ApeTech scripts are updated...
 #define ACM_DEFAULT_EXTENSION     ".acm"
 
+#define ACM_PATH_SEPERATOR '/'
+
 	typedef enum AcmErrorCode
 	{
-		ND_ERROR_SUCCESS,
+		ACM_ERROR_SUCCESS,
 
-		ND_ERROR_IO_READ,  /* read failure */
-		ND_ERROR_IO_WRITE, /* write failure */
+		ACM_ERROR_IO_READ,  /* read failure */
+		ACM_ERROR_IO_WRITE, /* write failure */
 
-		NL_ERROR_MEM_ALLOC, /* alloc failure */
+		ACM_ERROR_MEM_ALLOC, /* alloc failure */
 
-		ND_ERROR_INVALID_ARGUMENT,
-		ND_ERROR_INVALID_TYPE,     /* invalid node parent/child type */
-		ND_ERROR_INVALID_ELEMENTS, /* unexpected number of elements */
+		ACM_ERROR_INVALID_ARGUMENT,
+		ACM_ERROR_INVALID_TYPE,     /* invalid node parent/child type */
+		ACM_ERROR_INVALID_ELEMENTS, /* unexpected number of elements */
 	} AcmErrorCode;
 
 	typedef enum AcmFileType
@@ -79,18 +75,18 @@ extern "C"
 		ACM_PROPERTY_TYPE_BOOL,
 		ACM_PROPERTY_TYPE_FLOAT32,// float
 		ACM_PROPERTY_TYPE_FLOAT64,// double
-		ND_PROPERTY_INT8,         // int8
-		ND_PROPERTY_INT16,        // int16
-		ND_PROPERTY_INT32,        // int32
-		ND_PROPERTY_INT64,        // int64
-		ND_PROPERTY_UI8,          // uint8
-		ND_PROPERTY_UI16,         // uint16
-		ND_PROPERTY_UI32,         // uint32
-		ND_PROPERTY_UI64,         // uint64
+		ACM_PROPERTY_TYPE_INT8,   // int8
+		ACM_PROPERTY_TYPE_INT16,  // int16
+		ACM_PROPERTY_TYPE_INT32,  // int32
+		ACM_PROPERTY_TYPE_INT64,  // int64
+		ACM_PROPERTY_TYPE_UI8,    // uint8
+		ACM_PROPERTY_TYPE_UI16,   // uint16
+		ACM_PROPERTY_TYPE_UI32,   // uint32
+		ACM_PROPERTY_TYPE_UI64,   // uint64
 
 		ACM_PROPERTY_TYPE_FLOAT16,
 
-		ACM_MAX_PROPERTY_TYPES
+		ACM_PROPERTY_TYPE_MAX
 	} AcmPropertyType;
 
 	const char  *acm_get_error_message( void );
@@ -98,7 +94,7 @@ extern "C"
 
 	unsigned int acm_get_num_of_children( const AcmBranch *self ); /* only valid for object/array */
 	AcmBranch   *acm_get_first_child( AcmBranch *self );
-	AcmBranch   *acm_get_child_by_name( AcmBranch *self, const char *name ); /* only valid for object */
+	AcmBranch   *acm_get_child( AcmBranch *self, const char *path ); /* only valid for object */
 	AcmBranch   *acm_get_parent( AcmBranch *self );
 	AcmBranch   *acm_get_next_child( AcmBranch *node );
 

@@ -35,9 +35,9 @@ enum
 #define TEST_FUNC( NAME )       \
 	uint8_t test_##NAME( void ) \
 	{                           \
-		printf( " " #NAME "... \n" );
+		printf( " " #NAME "...\t" );
 #define TEST_FUNC_END()         \
-	printf( "\t\tOK\n" );       \
+	printf( "OK\n" );       \
 	return TEST_RETURN_SUCCESS; \
 	}
 #define CALL_FUNC_TEST( NAME )                                       \

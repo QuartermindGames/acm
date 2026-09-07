@@ -287,7 +287,7 @@ static void parse_line( const char *p, const char *file, unsigned int lineNum, A
 		if ( *p == '\"' )
 		{
 			symbolSize = get_enclosed_string_length( p ) + 1;
-			symbol     = ACM_NEW_( char, symbolSize );
+			symbol     = acm_mem_alloc( symbolSize );
 			if ( read_enclosed_string( &p, symbol, symbolSize ) == NULL )
 			{
 				Warning( "Failed to parse enclosed string: %u:%u\n", lineNum, linePos );
@@ -299,7 +299,7 @@ static void parse_line( const char *p, const char *file, unsigned int lineNum, A
 		else
 		{
 			symbolSize = get_token_length( p ) + 1;
-			symbol     = ACM_NEW_( char, symbolSize );
+			symbol     = acm_mem_alloc( symbolSize );
 			if ( read_token( &p, symbol, symbolSize ) == NULL )
 			{
 				Warning( "Failed to parse token for lexer: %u:%u\n", lineNum, linePos );
@@ -331,7 +331,7 @@ static void parse_line( const char *p, const char *file, unsigned int lineNum, A
 
 		if ( type != ACM_TOKEN_TYPE_INVALID )
 		{
-			AcmLexerToken *token = ACM_NEW( AcmLexerToken );
+			AcmLexerToken *token = acm_mem_alloc( sizeof( AcmLexerToken ) );
 			snprintf( token->path, sizeof( token->path ), "%s", file );//TODO: can be simplified!!!
 			token->symbol  = symbol;
 			token->lineNum = lineNum;
@@ -361,7 +361,7 @@ AcmLexer *acm_lexer_parse_buffer_( AcmLexer *self, const char *buf, const char *
 {
 	if ( self == NULL )
 	{
-		self = ACM_NEW( AcmLexer );
+		self = acm_mem_alloc( sizeof( AcmLexer ) );
 		if ( self == NULL )
 		{
 			return NULL;
@@ -406,12 +406,12 @@ AcmLexer *acm_lexer_parse_buffer_( AcmLexer *self, const char *buf, const char *
 		unsigned int bufSize = get_line_length( p ) + 1;
 		if ( bufSize > 1 )
 		{
-			char *line = ACM_NEW_( char, bufSize );
+			char *line = acm_mem_alloc( bufSize );
 			read_line( &p, line, bufSize );
 
 			parse_line( line, file, curLineNum, self );
 
-			ACM_DELETE( line );
+			acm_mem_free( line );
 		}
 		else
 		{
@@ -419,7 +419,7 @@ AcmLexer *acm_lexer_parse_buffer_( AcmLexer *self, const char *buf, const char *
 		}
 	}
 
-#if defined( ACM_TEST )
+#if defined( ACM_TEST_LEXER )
 	// output the result from the lexer
 	printf( "%5s %20s %10s %10s\n", "TYPE", "SYMBOL", "LINE", "LPOS" );
 	for ( const AcmLexerToken *token = self->start; token != NULL; token = token->next )

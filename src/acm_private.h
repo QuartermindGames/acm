@@ -40,6 +40,11 @@
 #define Message( FORMAT, ... ) printf( FORMAT, ##__VA_ARGS__ )
 #define Warning( FORMAT, ... ) printf( "WARNING: " FORMAT, ##__VA_ARGS__ )
 
+// do NOT use acm_calloc, acm_free and so on; use these internally instead!
+void *acm_mem_alloc( size_t size );
+void *acm_mem_realloc( void *p, size_t size );
+void  acm_mem_free( void *p );
+
 typedef struct AcmString
 {
 	char    *buf;
@@ -65,9 +70,7 @@ typedef struct AcmBranch
 	unsigned int numChildren;
 } AcmBranch;
 
-char      *acm_preprocess_script_( char *buf, size_t *length, bool isHead );
 AcmBranch *acm_push_new_branch( AcmBranch *parent, const char *name, AcmPropertyType propertyType, AcmPropertyType childType );
-
 AcmBranch *acm_push_variable_( AcmBranch *parent, const char *name, const char *value, AcmPropertyType type );
 
 /////////////////////////////////////////////////////////////////////////////////////
@@ -88,9 +91,6 @@ typedef enum AcmTokenType
 	ACM_TOKEN_TYPE_OPEN_BRACKET, // {
 	ACM_TOKEN_TYPE_CLOSE_BRACKET,// }
 } AcmTokenType;
-
-#define ACM_MAX_SYMBOL_LENGTH 128
-typedef char AcmSymbolName[ ACM_MAX_SYMBOL_LENGTH ];
 
 typedef struct AcmLexerToken
 {
