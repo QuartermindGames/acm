@@ -88,7 +88,7 @@ static unsigned int get_token_length( const char *p )
 	skip_whitespace( &p );
 
 	const char *s = p;
-	while ( *p != '\0' && *p != ' ' )
+	while ( *p != '\0' && !is_whitespace( p ) )
 	{
 		if ( is_line_end( p ) )
 		{
