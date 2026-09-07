@@ -1,5 +1,7 @@
 # ACM (Another Config Markup)
 
+ACM is a very minimalistic library, written in C11, for a very minimalistic config markup.
+
 When developing my own 3D engine, I was originally looking to use JSON but wasn't a huge fan of it—it didn't seem designed very well for human interaction. This was one of the things that led onto me developing ACM.
 
 I originally outlined this spec back in early 2020 before the pandemic, but it's changed quite a lot from that, for the better really.
@@ -8,7 +10,7 @@ This is mainly developed for ApeTech (my 3D engine), but I've published it in th
 
 <div align="center">
 
-[Features](#features) | [Syntax](#syntax) | [Compiling](#compiling)
+[Features](#features) | [Syntax](#syntax) | [Compiling](#compiling) | [Users](#users)
 
 </div>
 
@@ -111,3 +113,10 @@ generating a more optimal output for the binary version of the format.
 
 I've yet to build this for Windows (Linux is my daily driver), and certainly not against MSVC.
 My recommendation for now is to use GCC/Clang if you can, and I'll look at this hopefully soon.
+
+## Users
+
+If you're making use of this library I'd love to hear from you and include you in the list below! 🙂
+
+- [The Data Dungeon](https://archive.thedatadungeon.com/)
+- [ApeTech](https://www.hogsy.me/ape.htm)

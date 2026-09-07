@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-// Ape Config Markup
-// Copyright © 2020-2025 Mark E Sowden <hogsy@oldtimes-software.com>
+// Another Config Markup
+// Copyright © 2020-2026 Mark E Sowden <hogsy@oldtimes-software.com>
 
 //#define ACM_TEST
 
@@ -370,10 +370,6 @@ AcmLexer *acm_lexer_parse_buffer_( AcmLexer *self, const char *buf, const char *
 		snprintf( self->originPath, sizeof( self->originPath ), "%s", file );
 	}
 
-#if defined( ACM_TEST )
-	double startTime = PlGetCurrentSeconds();
-#endif
-
 	unsigned int curLineNum = 0;
 	const char  *p          = buf;
 	while ( *p != '\0' )
@@ -426,14 +422,10 @@ AcmLexer *acm_lexer_parse_buffer_( AcmLexer *self, const char *buf, const char *
 #if defined( ACM_TEST )
 	// output the result from the lexer
 	printf( "%5s %20s %10s %10s\n", "TYPE", "SYMBOL", "LINE", "LPOS" );
-	const AcmLexerToken *token;
-	PL_ITERATE_LINKED_LIST( token, AcmLexerToken, self->tokens, i )
+	for ( const AcmLexerToken *token = self->start; token != NULL; token = token->next )
 	{
 		printf( "%5d %20s %10u %10u\n", token->type, token->symbol, token->lineNum, token->linePos );
 	}
-
-	double endTime = PlGetCurrentSeconds();
-	printf( "Lexer took %lfs for \"%s\"\n", endTime - startTime, file );
 #endif
 
 	return self;

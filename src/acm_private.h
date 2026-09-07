@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-// Ape Config Markup
-// Copyright © 2020-2025 Mark E Sowden <hogsy@oldtimes-software.com>
+// Another Config Markup
+// Copyright © 2020-2026 Mark E Sowden <hogsy@oldtimes-software.com>
 
 #pragma once
 

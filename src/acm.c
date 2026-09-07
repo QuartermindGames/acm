@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-// Ape Config Markup
-// Copyright © 2020-2025 Mark E Sowden <hogsy@oldtimes-software.com>
+// Another Config Markup
+// Copyright © 2020-2026 Mark E Sowden <hogsy@oldtimes-software.com>
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -1625,19 +1625,72 @@ void acm_print_tree( AcmBranch *self, int index )
 
 #if defined( ACM_TEST )
 
+#	include "acm_test.h"
+
+TEST_FUNC( parse_spaces )
+static const char *buf = R"(
+object material
+{
+    array object passes
+    {
+        {
+		    string textureFilterMode mipmap_nearest
+            string shaderProgram base_skybox
+            object shaderParameters
+            {
+                array string cubeMap
+                {
+                    "materials/cubemaps/cubemap_space_03_1.png"
+                    "materials/cubemaps/cubemap_space_03_2.png"
+                    "materials/cubemaps/cubemap_space_03_3.png"
+                    "materials/cubemaps/cubemap_space_03_4.png"
+                    "materials/cubemaps/cubemap_space_03_5.png"
+                    "materials/cubemaps/cubemap_space_03_6.png"
+                }
+            }
+        }
+    }
+})";
+
+AcmBranch *root = acm_parse_buffer( buf, NULL );
+TEST_ASSERT( root != NULL );
+acm_branch_destroy( root );
+TEST_FUNC_END()
+
+TEST_FUNC( parse_tabs )
+static const char *buf = R"(
+object test
+{
+	string name "Hello World"
+
+	string otherName		"Hello"
+
+	object testChild
+	{
+		float myType1 0.1
+		float myType2 0.2
+		float myType3 0.3
+		float myType4 0.4
+		float myType5 0.5
+	}
+})";
+
+AcmBranch *root = acm_parse_buffer( buf, NULL );
+TEST_ASSERT( root != NULL );
+acm_branch_destroy( root );
+TEST_FUNC_END()
+
 int main( int argc, char **argv )
 {
-	PlInitialize( argc, argv );
+	argc;
+	argv;
 
-	AcmBranch *branch = acm_load_file( "projects/base/base.prj.n", NULL );
-	if ( branch == NULL )
-	{
-		return EXIT_FAILURE;
-	}
+	TEST_RUN_START
 
-	acm_print_tree( branch, 0 );
+	CALL_FUNC_TEST( parse_spaces )
+	CALL_FUNC_TEST( parse_tabs )
 
-	return EXIT_SUCCESS;
+	TEST_RUN_END
 }
 
 #endif
